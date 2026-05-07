@@ -809,9 +809,14 @@ function loadSched() {
   let stored = {};
   try { stored = JSON.parse(kv.getItem('coach_template_v1')) || {}; } catch(e) {}
   // If remote already has data, use it as-is (don't overlay INITIAL_SCHEDULE).
-  // Only seed from INITIAL_SCHEDULE if remote is completely empty.
-  currentSched = Object.keys(stored).length ? stored : { ...INITIAL_SCHEDULE };
-  persistCurrent();
+  // Only seed from INITIAL_SCHEDULE (and persist) if remote is completely empty;
+  // otherwise NO-OP — writing on every load races against other tabs and clobbers fresh server data.
+  if (Object.keys(stored).length) {
+    currentSched = stored;
+  } else {
+    currentSched = { ...INITIAL_SCHEDULE };
+    persistCurrent();
+  }
 
   // Drafts
   try { drafts = JSON.parse(kv.getItem('coach_drafts_v1')) || []; } catch(e) { drafts = []; }
