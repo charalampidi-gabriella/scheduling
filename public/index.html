@@ -100,6 +100,8 @@ tbody tr:hover td { background: #f8fafc; }
 .cell-empty { color: #cbd5e1; font-size: 12px; }
 .cell-add   { color: #94a3b8; font-size: 11px; margin-top: 2px; opacity: 0; transition: opacity 0.1s; }
 .day-col:hover .cell-add { opacity: 1; }
+.day-col.can-add:hover .add-hint { opacity: 1 !important; }
+.day-col.can-add:hover { background: #f0fdf4; }
 
 /* EDIT MODE */
 .edit-bar {
@@ -622,6 +624,8 @@ let schedule        = {};
 let editMode        = false;
 let pickedShift     = null;  // { coachId, dayIdx, shift, loc }
 let pendingMoves    = [];    // { fromCoachId, fromName, toCoachId, dayIdx, shift, loc }
+let pendingAdds     = [];    // { toCoachId, dayIdx, shift, loc }
+let addPicker       = null;  // { coachId, dayIdx, x, y } | null — UI state for the add-shift popup
 let lockedCoaches   = new Set(); // coachIds whose full schedule is locked
 let lockedShifts    = new Set(); // keys: `${coachId}_${dayIdx}_${shift}`
 let requests        = [];
@@ -960,7 +964,7 @@ function switchScope(scope) {
   persistScope();
   bindActiveSched();
   // Discard any in-flight edit-mode state
-  editMode = false; pickedShift = null; pendingMoves = [];
+  editMode = false; pickedShift = null; pendingMoves = []; pendingAdds = []; addPicker = null;
   render();
 }
 
@@ -1088,16 +1092,18 @@ function toggleEditMode() {
   editMode = !editMode;
   pickedShift = null;
   pendingMoves = [];
+  pendingAdds = [];
+  addPicker = null;
   renderOverview();
 }
 
 function discardMoves() {
-  editMode = false; pickedShift = null; pendingMoves = [];
+  editMode = false; pickedShift = null; pendingMoves = []; pendingAdds = []; addPicker = null;
   renderOverview();
 }
 
 function exportMoves() {
-  if (!pendingMoves.length) return;
+  if (!pendingMoves.length && !pendingAdds.length) return;
   try { _exportMoves(); } catch(e) { alert('Export error: ' + e.message); }
 }
 function _exportMoves() {
@@ -1105,7 +1111,10 @@ function _exportMoves() {
   const coachName = id => COACHES.find(c => c.id === id)?.name || id;
 
   // Collect affected days
-  const affectedDays = [...new Set(pendingMoves.map(m => m.dayIdx))].sort((a,b)=>a-b);
+  const affectedDays = [...new Set([
+    ...pendingMoves.map(m => m.dayIdx),
+    ...pendingAdds.map(a => a.dayIdx),
+  ])].sort((a,b)=>a-b);
 
   // Build preview schedule (same logic as previewSched but for all coaches)
   function previewAll(dayIdx) {
@@ -1117,6 +1126,9 @@ function _exportMoves() {
     pendingMoves.filter(m => m.dayIdx === dayIdx).forEach(m => {
       result[m.fromCoachId][m.shift] = null;
       result[m.toCoachId][m.shift] = m.loc;
+    });
+    pendingAdds.filter(a => a.dayIdx === dayIdx).forEach(a => {
+      result[a.toCoachId][a.shift] = a.loc;
     });
     return result;
   }
@@ -1147,9 +1159,9 @@ function _exportMoves() {
 </style>
 </head><body>
 <h1>Schedule Changes Export</h1>
-<div class="meta">Generated: ${ts} &nbsp;·&nbsp; ${pendingMoves.length} pending move${pendingMoves.length>1?'s':''}</div>
+<div class="meta">Generated: ${ts} &nbsp;·&nbsp; ${pendingMoves.length} pending move${pendingMoves.length===1?'':'s'} &nbsp;·&nbsp; ${pendingAdds.length} new shift${pendingAdds.length===1?'':'s'}</div>
 
-<h2>Moves Summary</h2>
+${pendingMoves.length ? `<h2>Moves Summary</h2>
 <table>
   <thead><tr><th>From</th><th></th><th>To</th><th>Day</th><th>Shift</th><th>Location</th></tr></thead>
   <tbody>
@@ -1162,14 +1174,30 @@ ${pendingMoves.map(m => `    <tr>
       <td class="loc">${m.loc.toUpperCase()}</td>
     </tr>`).join('\n')}
   </tbody>
-</table>
+</table>` : ''}
+
+${pendingAdds.length ? `<h2>New Shifts Added</h2>
+<table>
+  <thead><tr><th>Coach</th><th>Day</th><th>Shift</th><th>Location</th></tr></thead>
+  <tbody>
+${pendingAdds.map(a => `    <tr>
+      <td>${coachName(a.toCoachId)}</td>
+      <td>${DAYS[a.dayIdx]}</td>
+      <td style="text-transform:capitalize">${a.shift}</td>
+      <td class="loc">${a.loc.toUpperCase()}</td>
+    </tr>`).join('\n')}
+  </tbody>
+</table>` : ''}
 `;
 
   affectedDays.forEach(dayIdx => {
     const before = {};
     COACHES.forEach(c => { before[c.id] = gs(c.id, dayIdx); });
     const after = previewAll(dayIdx);
-    const changedIds = new Set(pendingMoves.filter(m=>m.dayIdx===dayIdx).flatMap(m=>[m.fromCoachId, m.toCoachId]));
+    const changedIds = new Set([
+      ...pendingMoves.filter(m=>m.dayIdx===dayIdx).flatMap(m=>[m.fromCoachId, m.toCoachId]),
+      ...pendingAdds.filter(a=>a.dayIdx===dayIdx).map(a=>a.toCoachId),
+    ]);
 
     ['morning','evening'].forEach(shift => {
       const cap = {};
@@ -1226,11 +1254,17 @@ function saveMoves() {
     toSched[m.shift + 'From'] = m.originFrom || m.fromName;
     ss(m.toCoachId, m.dayIdx, toSched);
   });
-  editMode = false; pickedShift = null; pendingMoves = [];
+  pendingAdds.forEach(a => {
+    const sched = { ...gs(a.toCoachId, a.dayIdx) };
+    sched[a.shift] = a.loc;
+    delete sched[a.shift + 'From'];
+    ss(a.toCoachId, a.dayIdx, sched);
+  });
+  editMode = false; pickedShift = null; pendingMoves = []; pendingAdds = []; addPicker = null;
   renderOverview();
 }
 
-// Returns the schedule for a coach/day with pending moves applied (including provenance).
+// Returns the schedule for a coach/day with pending moves + adds applied (including provenance).
 function previewSched(coachId, dayIdx) {
   const s = { ...gs(coachId, dayIdx) };
   pendingMoves.forEach(m => {
@@ -1243,7 +1277,59 @@ function previewSched(coachId, dayIdx) {
       s[m.shift + 'From'] = m.originFrom || m.fromName;
     }
   });
+  pendingAdds.forEach(a => {
+    if (a.toCoachId === coachId && a.dayIdx === dayIdx) {
+      s[a.shift] = a.loc;
+      delete s[a.shift + 'From'];
+    }
+  });
   return s;
+}
+
+// ── ADD-SHIFT (edit mode) ────────────────────────────────────────────────────
+function openAddPicker(coachId, dayIdx, evt) {
+  if (!editMode || pickedShift) return;
+  const coach = COACHES.find(c => c.id === coachId);
+  if (!coach || isCoachLocked(coachId)) return;
+  const s = previewSched(coachId, dayIdx);
+  const freeShifts = ['morning','evening'].filter(sh => !s[sh]);
+  if (!freeShifts.length) return;
+  if (!coach.locs.length) { alert(`${coach.name} has no eligible locations.`); return; }
+  const rect = (evt.currentTarget || evt.target).getBoundingClientRect();
+  addPicker = {
+    coachId, dayIdx,
+    x: rect.left + window.scrollX,
+    y: rect.bottom + window.scrollY + 4,
+    freeShifts,
+    locs: coach.locs.slice(),
+  };
+  renderOverview();
+}
+
+function closeAddPicker() {
+  if (!addPicker) return;
+  addPicker = null;
+  renderOverview();
+}
+
+function confirmAdd(coachId, dayIdx, shift, loc) {
+  // Capacity warning (warn-but-allow)
+  const cap = getCap(loc, dayIdx, shift);
+  const assigned = COACHES.filter(c => previewSched(c.id, dayIdx)[shift] === loc).length;
+  if (assigned >= cap) {
+    const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][dayIdx];
+    if (!confirm(`${LOCS[loc].name} ${shift} on ${dayName} is at capacity (${assigned}/${cap}). Add anyway?`)) {
+      return;
+    }
+  }
+  pendingAdds.push({ toCoachId: coachId, dayIdx, shift, loc });
+  addPicker = null;
+  renderOverview();
+}
+
+function removePendingAdd(coachId, dayIdx, shift) {
+  pendingAdds = pendingAdds.filter(a => !(a.toCoachId === coachId && a.dayIdx === dayIdx && a.shift === shift));
+  renderOverview();
 }
 
 function pickShift(coachId, dayIdx, shift) {
@@ -1370,6 +1456,8 @@ function renderOverview() {
         const isPicked = pickedShift && pickedShift.coachId === c.id && pickedShift.dayIdx === i;
         const movedM = pendingMoves.find(m => m.toCoachId === c.id && m.dayIdx === i && m.shift === 'morning');
         const movedE = pendingMoves.find(m => m.toCoachId === c.id && m.dayIdx === i && m.shift === 'evening');
+        const addedM = pendingAdds.find(a => a.toCoachId === c.id && a.dayIdx === i && a.shift === 'morning');
+        const addedE = pendingAdds.find(a => a.toCoachId === c.id && a.dayIdx === i && a.shift === 'evening');
 
         // Drop target logic
         let dropCls = '';
@@ -1397,10 +1485,22 @@ function renderOverview() {
           ${movedE ? `<div class="from-tag">\u2190 from ${movedE.originFrom || movedE.fromName}</div>` : ''}
         </div>` : '';
 
-        return `<td class="day-col ${dropCls}" onclick="dropOnCell(${c.id},${i})">
+        const coachLocked = isCoachLocked(c.id);
+        const hasFree = !s.morning || !s.evening;
+        const canAdd = !pickedShift && !coachLocked && hasFree && c.locs.length > 0;
+        const cellClick = pickedShift
+          ? `dropOnCell(${c.id},${i})`
+          : (canAdd ? `openAddPicker(${c.id},${i},event)` : '');
+        const addedTag = [addedM && 'morning', addedE && 'evening'].filter(Boolean).map(sh =>
+          `<div class="from-tag" style="color:#16a34a;cursor:pointer" title="Click to undo new shift" onclick="event.stopPropagation();removePendingAdd(${c.id},${i},'${sh}')">+ new ${sh} shift ✕</div>`
+        ).join('');
+
+        return `<td class="day-col ${dropCls} ${canAdd?'can-add':''}" onclick="${cellClick}" style="${canAdd?'cursor:copy':''}">
           <div class="cell-inner">
             ${mBadge}${eBadge}
-            ${!s.morning && !s.evening ? '<span class="cell-empty">\u2014</span>' : ''}
+            ${addedTag}
+            ${!s.morning && !s.evening ? `<span class="cell-empty" style="${canAdd?'color:#16a34a;font-weight:600':''}">${canAdd?'+ add':'\u2014'}</span>` : ''}
+            ${canAdd && (s.morning || s.evening) ? '<div style="font-size:10px;color:#16a34a;font-weight:600;opacity:0;transition:opacity .1s" class="add-hint">+ add other shift</div>' : ''}
           </div>
         </td>`;
       } else {
@@ -1422,20 +1522,42 @@ function renderOverview() {
   </tr>`;
   }).join('')}</tbody>`;
 
+  const hasPending = pendingMoves.length || pendingAdds.length;
   const editBar = editMode ? `<div class="edit-bar">
     <div class="edit-bar-info">
-      ${pickedShift ? `<span style="color:#fbbf24">Shift picked — click a coach cell to place it</span>` : `Edit mode — click a shift to pick it up`}
-      ${pendingMoves.length ? `<span>${pendingMoves.length} move${pendingMoves.length>1?'s':''} pending</span>` : ''}
+      ${pickedShift ? `<span style="color:#fbbf24">Shift picked — click a coach cell to place it</span>` : `Edit mode — click a shift to move, or click an empty cell to add a new shift`}
+      ${pendingMoves.length ? `<span>${pendingMoves.length} move${pendingMoves.length>1?'s':''}</span>` : ''}
+      ${pendingAdds.length ? `<span style="background:#16a34a">${pendingAdds.length} new shift${pendingAdds.length>1?'s':''}</span>` : ''}
     </div>
     <div class="edit-bar-btns">
       <button class="btn btn-ghost" style="color:white;border-color:#475569" onclick="discardMoves()">Discard</button>
-      <button class="btn btn-ghost" style="color:white;border-color:#475569" ${!pendingMoves.length?'disabled style="opacity:.4"':''} onclick="exportMoves()">Export</button>
-      <button class="btn btn-primary" ${!pendingMoves.length?'disabled style="opacity:.4"':''} onclick="saveMoves()">Save Changes</button>
+      <button class="btn btn-ghost" style="color:white;border-color:#475569" ${!hasPending?'disabled style="opacity:.4"':''} onclick="exportMoves()">Export</button>
+      <button class="btn btn-primary" ${!hasPending?'disabled style="opacity:.4"':''} onclick="saveMoves()">Save Changes</button>
     </div>
   </div>` : '';
 
+  // Add-shift picker popup
+  let pickerHtml = '';
+  if (addPicker) {
+    const coach = COACHES.find(c => c.id === addPicker.coachId);
+    const dayName = DAYS[addPicker.dayIdx];
+    const rows = addPicker.freeShifts.map(sh => {
+      const btns = addPicker.locs.map(loc => `<button class="sbadge ${sh==='morning'?'m':'e'} ${loc}" style="margin:2px;border:none;cursor:pointer;font-size:12px;padding:5px 10px"
+        onclick="event.stopPropagation();confirmAdd(${addPicker.coachId},${addPicker.dayIdx},'${sh}','${loc}')"><span class="sloc">${LOCS[loc].name}</span>${sh==='morning'?'Morning':'Evening'}</button>`).join('');
+      return `<div style="margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px">${sh}</div>${btns}</div>`;
+    }).join('');
+    pickerHtml = `<div style="position:fixed;inset:0;z-index:300" onclick="closeAddPicker()">
+      <div style="position:absolute;left:${addPicker.x}px;top:${addPicker.y}px;background:white;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.15);padding:12px 14px;min-width:220px"
+        onclick="event.stopPropagation()">
+        <div style="font-size:12px;color:#64748b;margin-bottom:8px"><strong style="color:#1e293b">${coach.name}</strong> · ${dayName} · pick shift &amp; location</div>
+        ${rows}
+        <button class="btn btn-ghost" style="margin-top:4px;font-size:12px;padding:4px 8px" onclick="closeAddPicker()">Cancel</button>
+      </div>
+    </div>`;
+  }
+
   document.getElementById('pane-overview').innerHTML =
-    filterBar + `<div class="tbl-wrap ${editMode?'in-edit':''}"><table>${thead}${tbody}</table></div>` + editBar;
+    filterBar + `<div class="tbl-wrap ${editMode?'in-edit':''}"><table>${thead}${tbody}</table></div>` + editBar + pickerHtml;
 }
 
 function fchip(loc, label, cls = '') {
