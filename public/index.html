@@ -1218,23 +1218,30 @@ function saveMoves() {
   pendingMoves.forEach(m => {
     const fromSched = { ...gs(m.fromCoachId, m.dayIdx) };
     fromSched[m.shift] = null;
-    delete fromSched[m.shift + 'From']; // clear any inherited provenance on the source side
+    delete fromSched[m.shift + 'From'];
     ss(m.fromCoachId, m.dayIdx, fromSched);
     const toSched = { ...gs(m.toCoachId, m.dayIdx) };
     toSched[m.shift] = m.loc;
-    toSched[m.shift + 'From'] = m.fromName; // persist provenance so it survives save
+    // Persist the *original* origin so chained moves keep showing the source coach
+    toSched[m.shift + 'From'] = m.originFrom || m.fromName;
     ss(m.toCoachId, m.dayIdx, toSched);
   });
   editMode = false; pickedShift = null; pendingMoves = [];
   renderOverview();
 }
 
-// Returns the schedule for a coach/day with pending moves applied
+// Returns the schedule for a coach/day with pending moves applied (including provenance).
 function previewSched(coachId, dayIdx) {
   const s = { ...gs(coachId, dayIdx) };
   pendingMoves.forEach(m => {
-    if (m.fromCoachId === coachId && m.dayIdx === dayIdx) s[m.shift] = null;
-    if (m.toCoachId   === coachId && m.dayIdx === dayIdx) s[m.shift] = m.loc;
+    if (m.fromCoachId === coachId && m.dayIdx === dayIdx) {
+      s[m.shift] = null;
+      delete s[m.shift + 'From'];
+    }
+    if (m.toCoachId === coachId && m.dayIdx === dayIdx) {
+      s[m.shift] = m.loc;
+      s[m.shift + 'From'] = m.originFrom || m.fromName;
+    }
   });
   return s;
 }
@@ -1247,7 +1254,7 @@ function pickShift(coachId, dayIdx, shift) {
   }
   const s = previewSched(coachId, dayIdx);
   if (!s[shift]) return;
-  pickedShift = { coachId, dayIdx, shift, loc: s[shift] };
+  pickedShift = { coachId, dayIdx, shift, loc: s[shift], originFrom: s[shift + 'From'] || null };
   renderOverview();
 }
 
@@ -1260,7 +1267,14 @@ function dropOnCell(toCoachId, dayIdx) {
   const tSched = previewSched(toCoachId, dayIdx);
   if (tSched[pickedShift.shift]) return;
   const fromCoach = COACHES.find(c => c.id === pickedShift.coachId);
-  pendingMoves.push({ fromCoachId: pickedShift.coachId, fromName: fromCoach.name, toCoachId, dayIdx, shift: pickedShift.shift, loc: pickedShift.loc });
+  pendingMoves.push({
+    fromCoachId: pickedShift.coachId,
+    fromName: fromCoach.name,
+    toCoachId, dayIdx,
+    shift: pickedShift.shift,
+    loc: pickedShift.loc,
+    originFrom: pickedShift.originFrom || fromCoach.name, // preserve original origin across chains
+  });
   pickedShift = null;
   renderOverview();
 }
@@ -1372,7 +1386,7 @@ function renderOverview() {
             onclick="event.stopPropagation();pickShift(${c.id},${i},'morning')">
             <span class="sloc">${LOCS[s.morning].name}</span>Morning${mLocked ? ' 🔒' : ''}
           </span>
-          ${movedM ? `<div class="from-tag">\u2190 from ${movedM.fromName}</div>` : ''}
+          ${movedM ? `<div class="from-tag">\u2190 from ${movedM.originFrom || movedM.fromName}</div>` : ''}
         </div>` : '';
         const eBadge = s.evening ? `<div>
           <span class="sbadge e ${s.evening} ${eLocked ? 'shift-locked' : 'in-edit-mode'} ${isPicked && pickedShift.shift==='evening' ? 'picked' : ''} ${movedE?'moved':''}"
@@ -1380,7 +1394,7 @@ function renderOverview() {
             onclick="event.stopPropagation();pickShift(${c.id},${i},'evening')">
             <span class="sloc">${LOCS[s.evening].name}</span>Evening${eLocked ? ' 🔒' : ''}
           </span>
-          ${movedE ? `<div class="from-tag">\u2190 from ${movedE.fromName}</div>` : ''}
+          ${movedE ? `<div class="from-tag">\u2190 from ${movedE.originFrom || movedE.fromName}</div>` : ''}
         </div>` : '';
 
         return `<td class="day-col ${dropCls}" onclick="dropOnCell(${c.id},${i})">
