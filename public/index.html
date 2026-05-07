@@ -1408,11 +1408,19 @@ function selCoach(id) { selectedCoachId = id; renderCoach(); }
 let rms = {}; // request modal state
 
 function reqSummary(r) {
-  const coach  = COACHES.find(c => c.id === r.coachId);
+  const coach = COACHES.find(c => c.id === r.coachId);
+  const fromShiftLabel = r.shift === 'morning' ? 'Morning' : 'Evening';
+  if (r.action === 'move_day') {
+    const fromDayLabel = (r.days && r.days.length) ? DAYS[r.days[0]].slice(0,3) : '?';
+    const toShiftLabel = r.toShift === 'morning' ? 'AM' : 'PM';
+    const toDaysLabel = (!r.toDays || r.toDays.length === 0)
+      ? 'any day'
+      : r.toDays.map(i => DAYS[i].slice(0,3)).join('/');
+    return `${coach?.name}: ${fromDayLabel} ${fromShiftLabel} → ${toDaysLabel} ${toShiftLabel}`;
+  }
   const days   = r.days.map(i => DAYS[i].slice(0,3)).join(', ');
-  const from   = r.shift === 'morning' ? 'Morning' : 'Evening';
   const action = r.action === 'to_morning' ? '→ Morning' : r.action === 'to_evening' ? '→ Evening' : '→ Remove';
-  return `${coach?.name}: ${from} ${action} — ${days}`;
+  return `${coach?.name}: ${fromShiftLabel} ${action} — ${days}`;
 }
 
 function renderRequests() {
@@ -1433,13 +1441,30 @@ function renderRequests() {
 
   function cardHTML(r) {
     const coach   = COACHES.find(c => c.id === r.coachId);
-    const days    = r.days.map(i => DAYS[i].slice(0,3)).join(', ');
     const from    = r.shift === 'morning' ? 'Morning' : 'Evening';
-    const toLabel = r.action === 'to_morning' ? 'Convert to Morning' : r.action === 'to_evening' ? 'Convert to Evening' : 'Remove shift';
     const typeBadge = r.type === 'request'
       ? `<span class="req-badge" style="background:#ede9fe;color:#4c1d95">Request</span>`
       : `<span class="req-badge" style="background:#e0f2fe;color:#075985">Flexible</span>`;
     const canApply = r.status === 'pending' || r.status === 'approved';
+
+    let textHTML, daysHTML, configured;
+    if (r.action === 'move_day') {
+      configured = r.days && r.days.length === 1;
+      const fromDay = configured ? DAYS[r.days[0]] : 'TBD';
+      const toShift = r.toShift === 'morning' ? 'Morning' : 'Evening';
+      const toDays = (!r.toDays || r.toDays.length === 0)
+        ? 'any day'
+        : r.toDays.map(i => DAYS[i].slice(0,3)).join(' / ');
+      textHTML = `<strong>${fromDay} ${from}</strong> &rarr; <strong>${toDays} ${toShift}</strong>`;
+      daysHTML = `<div style="font-size:12px;color:var(--muted)">Move day request</div>`;
+    } else {
+      const days    = r.days.map(i => DAYS[i].slice(0,3)).join(', ');
+      const toLabel = r.action === 'to_morning' ? 'Convert to Morning' : r.action === 'to_evening' ? 'Convert to Evening' : 'Remove shift';
+      textHTML = `<strong>${from}</strong> &rarr; <strong>${toLabel}</strong>`;
+      daysHTML = `<div style="font-size:12px;color:${r.days.length?'var(--muted)':'#dc2626'}">Days: ${r.days.length ? days : 'TBD — edit to specify'}</div>`;
+      configured = r.days.length > 0;
+    }
+
     return `<div class="req-card status-${r.status}">
       <div style="flex:1">
         <div class="req-coach">
@@ -1447,16 +1472,14 @@ function renderRequests() {
           ${typeBadge}
           <span class="req-badge ${r.status}">${r.status}</span>
         </div>
-        <div class="req-text" style="margin:6px 0 4px">
-          <strong>${from}</strong> &rarr; <strong>${toLabel}</strong>
-        </div>
-        <div style="font-size:12px;color:${r.days.length?'var(--muted)':'#dc2626'}">Days: ${r.days.length ? days : 'TBD — edit to specify'}</div>
+        <div class="req-text" style="margin:6px 0 4px">${textHTML}</div>
+        ${daysHTML}
         ${r.loc ? `<div style="font-size:12px;color:var(--muted)">Location: ${LOCS[r.loc]?.name || r.loc}</div>` : ''}
         ${r.note ? `<div class="req-note" style="margin-top:4px">Note: ${r.note}</div>` : ''}
       </div>
       <div class="req-actions" style="flex-direction:column;align-items:flex-end">
-        ${canApply && r.days.length ? `<button class="req-btn approve" onclick="previewReq(${r.id})">Preview</button>` : ''}
-        ${canApply && r.days.length ? `<button class="req-btn done-btn" onclick="applyReq(${r.id})">Apply</button>` : ''}
+        ${canApply && configured ? `<button class="req-btn approve" onclick="previewReq(${r.id})">Preview</button>` : ''}
+        ${canApply && configured ? `<button class="req-btn done-btn" onclick="applyReq(${r.id})">Apply</button>` : ''}
         ${r.status === 'pending' ? `<button class="req-btn" onclick="editReq(${r.id})">Edit</button>` : ''}
         ${r.status === 'pending' && r.type === 'request' ? `<button class="req-btn deny" onclick="reqSetStatus(${r.id},'denied')">Deny</button>` : ''}
         ${r.status !== 'pending' ? `<button class="req-btn" onclick="reqSetStatus(${r.id},'pending')">Reopen</button>` : ''}
@@ -1480,27 +1503,67 @@ function reqDelete(id) { if (confirm('Delete this item?')) { deleteRequest(id); 
 // ── REQUEST MODAL ─────────────────────────────────────────────────────────────
 function openReqModal() {
   const firstCoach = COACHES.find(c => c.locs.length);
-  rms = { type:'request', coachId: firstCoach.id, shift:'morning', action:'to_evening', days:[], loc: firstCoach.locs[0], note:'' };
+  rms = {
+    type:'request', coachId: firstCoach.id,
+    shift:'morning', action:'to_evening',
+    days:[], loc: firstCoach.locs[0], note:'',
+    toShift:'morning', toDays:[],
+  };
   renderReqModal();
 }
 
 function renderReqModal() {
   const coach     = COACHES.find(c => c.id === rms.coachId);
   const availDays = DAYS.map((_, i) => gs(rms.coachId, i)[rms.shift] ? i : null).filter(i => i !== null);
+  const isMove    = rms.action === 'move_day';
   const showLoc   = coach.locs.length > 1 && rms.action !== 'remove';
 
-  // Available actions depend on which shift we're changing
+  // Action options — same set regardless of source shift; move_day is always available
   const actionOpts = rms.shift === 'morning'
-    ? [{ v:'to_evening', l:'Convert to Evening' }, { v:'remove', l:'Remove shift' }]
-    : [{ v:'to_morning', l:'Convert to Morning' }, { v:'remove', l:'Remove shift' }];
+    ? [{ v:'to_evening', l:'Convert to Evening' }, { v:'move_day', l:'Move to different day' }, { v:'remove', l:'Remove shift' }]
+    : [{ v:'to_morning', l:'Convert to Morning' }, { v:'move_day', l:'Move to different day' }, { v:'remove', l:'Remove shift' }];
+
+  // Day chips for "from" — for move_day, single-select; otherwise multi-select
+  const fromDaysHTML = `
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${DAYS.map((d,i)=>{
+        const has = availDays.includes(i);
+        const sel = rms.days.includes(i);
+        return `<button class="day-tab ${sel?'active':''}" ${!has?'disabled style="opacity:.3;cursor:not-allowed"':''} onclick="rmsToggleDay(${i})">${d.slice(0,3)}</button>`;
+      }).join('')}
+    </div>
+    ${availDays.length===0?`<div style="font-size:12px;color:#dc2626;margin-top:6px">No ${rms.shift} shifts found for this coach.</div>`:''}
+  `;
+
+  // Move-day-specific section: target shift + target days (with "Any day" option)
+  const moveSectionHTML = isMove ? `
+    <div class="form-row" style="margin:0;padding-top:10px;border-top:1px dashed var(--border)">
+      <label class="form-label">Target shift</label>
+      <div style="display:flex;gap:8px">
+        <button class="loc-opt wilco ${rms.toShift==='morning'?'sel':''}" onclick="rmsSet('toShift','morning')">Morning</button>
+        <button class="loc-opt wilco ${rms.toShift==='evening'?'sel':''}" onclick="rmsSet('toShift','evening')">Evening</button>
+      </div>
+    </div>
+    <div class="form-row" style="margin:0">
+      <label class="form-label">Target day(s) <span style="font-weight:400;color:var(--muted)">(empty = any day)</span></label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <button class="day-tab ${rms.toDays.length===0?'active':''}" onclick="rmsAnyDay()">Any day</button>
+        <span style="color:var(--muted);font-size:11px">or pick specific:</span>
+        ${DAYS.map((d,i)=>{
+          const sel = rms.toDays.includes(i);
+          return `<button class="day-tab ${sel?'active':''}" onclick="rmsToggleToDay(${i})">${d.slice(0,3)}</button>`;
+        }).join('')}
+      </div>
+    </div>
+  ` : '';
 
   document.getElementById('modal-root').innerHTML = `
     <div class="overlay" onclick="bgClose(event)">
-      <div class="modal" style="width:460px">
+      <div class="modal" style="width:480px;max-height:90vh;display:flex;flex-direction:column">
         <div class="mhead">
-          <div class="mhead-title">Add Change Item</div>
+          <div class="mhead-title">${rms.editId?'Edit':'Add'} Change Item</div>
         </div>
-        <div class="mbody" style="display:flex;flex-direction:column;gap:16px">
+        <div class="mbody" style="display:flex;flex-direction:column;gap:16px;overflow-y:auto">
           <div class="form-row" style="margin:0">
             <label class="form-label">Type</label>
             <div style="display:flex;gap:8px">
@@ -1515,7 +1578,7 @@ function renderReqModal() {
             </select>
           </div>
           <div class="form-row" style="margin:0">
-            <label class="form-label">Shift to change</label>
+            <label class="form-label">Existing shift to change</label>
             <div style="display:flex;gap:8px">
               <button class="loc-opt wilco ${rms.shift==='morning'?'sel':''}" onclick="rmsSet('shift','morning')">Morning</button>
               <button class="loc-opt wilco ${rms.shift==='evening'?'sel':''}" onclick="rmsSet('shift','evening')">Evening</button>
@@ -1528,18 +1591,12 @@ function renderReqModal() {
             </div>
           </div>
           <div class="form-row" style="margin:0">
-            <label class="form-label">Days <span style="font-weight:400;color:var(--muted)">(coach must have that shift on selected days)</span></label>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
-              ${DAYS.map((d,i)=>{
-                const has = availDays.includes(i);
-                const sel = rms.days.includes(i);
-                return `<button class="day-tab ${sel?'active':''}" ${!has?'disabled style="opacity:.3;cursor:not-allowed"':''} onclick="rmsToggleDay(${i})">${d.slice(0,3)}</button>`;
-              }).join('')}
-            </div>
-            ${availDays.length===0?`<div style="font-size:12px;color:#dc2626;margin-top:6px">No ${rms.shift} shifts found for this coach.</div>`:''}
+            <label class="form-label">${isMove ? 'Move from day' : 'Days'} <span style="font-weight:400;color:var(--muted)">${isMove ? '(pick exactly one)' : '(coach must have that shift on selected days)'}</span></label>
+            ${fromDaysHTML}
           </div>
+          ${moveSectionHTML}
           ${showLoc?`<div class="form-row" style="margin:0">
-            <label class="form-label">New location</label>
+            <label class="form-label">${isMove ? 'Target location' : 'New location'}</label>
             <div class="loc-opts">${coach.locs.map(lk=>`<button class="loc-opt ${lk} ${rms.loc===lk?'sel':''}" onclick="rmsSet('loc','${lk}')">${LOCS[lk].name}</button>`).join('')}</div>
           </div>`:''}
           <div class="form-row" style="margin:0">
@@ -1561,30 +1618,58 @@ function renderReqModal() {
 function rmsSet(key, val) {
   rms[key] = val;
   if (key === 'coachId') { rms.days = []; const c = COACHES.find(c=>c.id===val); rms.loc = c?.locs[0]||null; }
-  if (key === 'shift')   { rms.days = []; rms.action = val==='morning'?'to_evening':'to_morning'; }
+  if (key === 'shift')   {
+    rms.days = [];
+    if (rms.action !== 'move_day') rms.action = val==='morning'?'to_evening':'to_morning';
+  }
+  if (key === 'action' && val === 'move_day') {
+    // Default target shift to same as source shift; keep days array but clamp to single
+    if (rms.toShift == null) rms.toShift = rms.shift;
+    if (rms.days.length > 1) rms.days = rms.days.slice(0, 1);
+  }
   renderReqModal();
 }
 function rmsToggleDay(i) {
-  rms.days = rms.days.includes(i) ? rms.days.filter(d=>d!==i) : [...rms.days,i].sort((a,b)=>a-b);
+  if (rms.action === 'move_day') {
+    // Single-select for move_day
+    rms.days = rms.days[0] === i ? [] : [i];
+  } else {
+    rms.days = rms.days.includes(i) ? rms.days.filter(d=>d!==i) : [...rms.days,i].sort((a,b)=>a-b);
+  }
   renderReqModal();
 }
+function rmsToggleToDay(i) {
+  rms.toDays = rms.toDays.includes(i) ? rms.toDays.filter(d=>d!==i) : [...rms.toDays,i].sort((a,b)=>a-b);
+  renderReqModal();
+}
+function rmsAnyDay() { rms.toDays = []; renderReqModal(); }
 
 function submitReq() {
   const coach = COACHES.find(c=>c.id===rms.coachId);
   const loc   = coach.locs.length===1 ? coach.locs[0] : (rms.loc||coach.locs[0]);
+  const payload = {
+    type:rms.type, coachId:rms.coachId, shift:rms.shift, action:rms.action,
+    days:[...rms.days], loc, note:rms.note,
+    toShift: rms.action === 'move_day' ? rms.toShift : undefined,
+    toDays:  rms.action === 'move_day' ? [...rms.toDays] : undefined,
+  };
   if (rms.editId) {
-    // Edit existing
     const r = requests.find(r=>r.id===rms.editId);
-    Object.assign(r, { type:rms.type, coachId:rms.coachId, shift:rms.shift, action:rms.action, days:[...rms.days], loc, note:rms.note });
+    Object.assign(r, payload);
   } else {
-    requests.unshift({ id:Date.now(), type:rms.type, coachId:rms.coachId, shift:rms.shift, action:rms.action, days:[...rms.days], loc, note:rms.note, status:'pending', createdAt:new Date().toISOString() });
+    requests.unshift({ id:Date.now(), ...payload, status:'pending', createdAt:new Date().toISOString() });
   }
   saveReqs(); updateReqBadge(); closeModal(); renderRequests();
 }
 
 function editReq(id) {
   const r = requests.find(r=>r.id===id);
-  rms = { type:r.type, coachId:r.coachId, shift:r.shift, action:r.action, days:[...r.days], loc:r.loc, note:r.note, editId:id };
+  rms = {
+    type:r.type, coachId:r.coachId, shift:r.shift, action:r.action,
+    days:[...(r.days||[])], loc:r.loc, note:r.note, editId:id,
+    toShift: r.toShift || r.shift,
+    toDays:  [...(r.toDays || [])],
+  };
   renderReqModal();
 }
 
@@ -1592,6 +1677,8 @@ function editReq(id) {
 function previewReq(id) {
   const r     = requests.find(r=>r.id===id);
   const coach = COACHES.find(c=>c.id===r.coachId);
+
+  if (r.action === 'move_day') return previewMoveDay(r);
 
   const rows = r.days.map(dayIdx => {
     const cur      = gs(r.coachId, dayIdx);
@@ -1653,6 +1740,7 @@ function previewReq(id) {
 function applyReq(id) {
   if (isReadOnly()) { alert('Cannot apply to the current (read-only) schedule. Switch to a draft.'); return; }
   const r = requests.find(r=>r.id===id);
+  if (r.action === 'move_day') return applyMoveDay(r);
   r.days.forEach(dayIdx => {
     const cur     = { ...gs(r.coachId, dayIdx) };
     const newShift = r.action==='to_morning' ? 'morning' : r.action==='to_evening' ? 'evening' : null;
@@ -1664,6 +1752,98 @@ function applyReq(id) {
     }
     ss(r.coachId, dayIdx, cur);
   });
+  r.status = 'done';
+  saveReqs(); updateReqBadge(); render();
+}
+
+// ── MOVE_DAY: preview + apply ─────────────────────────────────────────────────
+function moveDayCandidates(r) {
+  // Candidate target days = explicit toDays OR all 7 days; exclude the source day.
+  const fromDay = r.days[0];
+  const candidates = (r.toDays && r.toDays.length) ? r.toDays : DAYS.map((_, i) => i);
+  return candidates.filter(d => d !== fromDay);
+}
+
+function previewMoveDay(r) {
+  const coach   = COACHES.find(c=>c.id===r.coachId);
+  const fromDay = r.days[0];
+  const cur     = gs(r.coachId, fromDay);
+  const fromLoc = cur[r.shift];
+  const targets = moveDayCandidates(r);
+
+  // Source impact (always)
+  let html = `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+    <div style="font-size:13px;font-weight:700">From: ${DAYS[fromDay]} ${r.shift === 'morning' ? 'Morning' : 'Evening'}</div>`;
+  if (fromLoc) {
+    const cap = getCap(fromLoc, fromDay, r.shift);
+    const cnt = COACHES.filter(c=>gs(c.id,fromDay)[r.shift]===fromLoc).length;
+    html += `<div style="font-size:12px;margin-top:3px">${LOCS[fromLoc].name} ${r.shift==='morning'?'AM':'PM'}: ${cnt}→${cnt-1}/${cap} <span style="color:#dc2626">-1</span></div>`;
+  } else {
+    html += `<div style="font-size:12px;color:var(--muted);margin-top:3px">No existing shift on this day. Cannot move.</div>`;
+  }
+  html += `</div>`;
+
+  // Per-candidate target impact
+  html += `<div style="padding:10px 0">
+    <div style="font-size:13px;font-weight:700;margin-bottom:8px">To (${targets.length} candidate${targets.length===1?'':'s'}):</div>`;
+
+  targets.forEach(toDay => {
+    const tLoc = r.loc || coach.locs[0];
+    const cap = getCap(tLoc, toDay, r.toShift);
+    const cnt = COACHES.filter(c=>gs(c.id,toDay)[r.toShift]===tLoc).length;
+    const conflict = gs(r.coachId, toDay)[r.toShift];
+    const after = cnt + 1;
+    const over  = after > cap;
+    const note = conflict
+      ? ` <span style="color:#dc2626;font-size:10px">⚠ coach already has shift</span>`
+      : over ? ` <span style="color:#dc2626;font-size:10px">⚠ over</span>`
+      : ` <span style="color:#16a34a;font-size:10px">✓</span>`;
+    html += `<div style="font-size:12px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center">
+      <span><strong>${DAYS[toDay]}</strong> · ${LOCS[tLoc].name} ${r.toShift==='morning'?'AM':'PM'}: ${cnt}→${after}/${cap} <span style="color:#16a34a">+1</span>${note}</span>
+      ${(fromLoc && !conflict) ? `<button class="req-btn approve" onclick="closeModal();applyMoveDayTo(${r.id},${toDay})" style="padding:3px 10px">Apply to ${DAYS[toDay].slice(0,3)}</button>` : ''}
+    </div>`;
+  });
+  html += `</div>`;
+
+  document.getElementById('modal-root').innerHTML = `
+    <div class="overlay" onclick="bgClose(event)">
+      <div class="modal" style="width:520px">
+        <div class="mhead">
+          <div class="mhead-title">Preview move: ${coach.name}</div>
+          <div class="mhead-sub">${reqSummary(r)}</div>
+        </div>
+        <div class="mbody">${html}</div>
+        <div class="mfoot">
+          <div></div>
+          <div class="mfoot-right">
+            <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function applyMoveDay(r) {
+  // If there's exactly one candidate, apply directly. Otherwise open the preview modal so admin picks.
+  const targets = moveDayCandidates(r);
+  if (targets.length === 1) return applyMoveDayTo(r.id, targets[0]);
+  previewMoveDay(r);
+}
+
+function applyMoveDayTo(reqId, toDay) {
+  if (isReadOnly()) { alert('Cannot apply to the current (read-only) schedule. Switch to a draft.'); return; }
+  const r = requests.find(r=>r.id===reqId);
+  if (!r) return;
+  const fromDay = r.days[0];
+  const fromCur = { ...gs(r.coachId, fromDay) };
+  const loc = fromCur[r.shift] || r.loc;
+  fromCur[r.shift] = null;
+  ss(r.coachId, fromDay, fromCur);
+
+  const toCur = { ...gs(r.coachId, toDay) };
+  toCur[r.toShift] = loc;
+  ss(r.coachId, toDay, toCur);
+
   r.status = 'done';
   saveReqs(); updateReqBadge(); render();
 }
