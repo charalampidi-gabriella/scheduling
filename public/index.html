@@ -461,6 +461,7 @@ tr.coach-locked > td.t-today { background: #fef9c3 !important; }
   <button class="tab-btn"        data-tab="location" onclick="setTab('location')">By Location</button>
   <button class="tab-btn"        data-tab="coach"    onclick="setTab('coach')">Coach</button>
   <button class="tab-btn"        data-tab="requests" onclick="setTab('requests')" id="req-tab">Requests</button>
+  <button class="tab-btn"        data-tab="config"   onclick="setTab('config')">Config</button>
 </div>
 
 <div id="main">
@@ -468,18 +469,21 @@ tr.coach-locked > td.t-today { background: #fef9c3 !important; }
   <div id="pane-location" class="hidden"></div>
   <div id="pane-coach"     class="hidden"></div>
   <div id="pane-requests"  class="hidden"></div>
+  <div id="pane-config"    class="hidden"></div>
 </div>
 
 <div id="modal-root"></div>
 
 <script>
 // ── REMOTE KV (D1-backed, mirrors what was localStorage) ─────────────────────
-const KV_KEYS = ['current_schedule','drafts','locks','requests'];
+const KV_KEYS = ['current_schedule','drafts','locks','requests','coaches','locations'];
 const LOCAL_TO_REMOTE = {
   coach_template_v1: 'current_schedule',
   coach_drafts_v1:   'drafts',
   coach_locks_v1:    'locks',
   coach_requests_v1: 'requests',
+  coach_roster_v1:   'coaches',
+  coach_locations_v1:'locations',
 };
 const kv = {
   cache: {},        // localStorage-key → JSON string
@@ -490,10 +494,12 @@ const kv = {
     const r = await fetch('/api/state', { cache: 'no-store' });
     if (!r.ok) throw new Error('Failed to load state: ' + r.status);
     const data = await r.json();
-    this.cache.coach_template_v1 = JSON.stringify(data.current_schedule ?? {});
-    this.cache.coach_drafts_v1   = JSON.stringify(data.drafts ?? []);
-    this.cache.coach_locks_v1    = JSON.stringify(data.locks ?? { coaches:[], shifts:[] });
-    this.cache.coach_requests_v1 = JSON.stringify(data.requests ?? []);
+    this.cache.coach_template_v1  = JSON.stringify(data.current_schedule ?? {});
+    this.cache.coach_drafts_v1    = JSON.stringify(data.drafts ?? []);
+    this.cache.coach_locks_v1     = JSON.stringify(data.locks ?? { coaches:[], shifts:[] });
+    this.cache.coach_requests_v1  = JSON.stringify(data.requests ?? []);
+    this.cache.coach_roster_v1    = JSON.stringify(data.coaches ?? []);
+    this.cache.coach_locations_v1 = JSON.stringify(data.locations ?? {});
   },
   isRemoteEmpty() {
     const sched = JSON.parse(this.cache.coach_template_v1 || '{}');
@@ -548,8 +554,9 @@ function updateSyncIndicator() {
 }
 
 // ── DATA ──────────────────────────────────────────────────────────────────────
-// Court capacity per day (index 0=Mon … 6=Sun) per shift
-const LOCS = {
+// Court capacity per day (index 0=Mon … 6=Sun) per shift.
+// These are DEFAULTS — actual values are loaded from KV at boot (see hydrateConfig).
+let LOCS = {
   satc:  {
     name: 'SATC',
     morning: [5, 5, 5, 5, 5, 6, 6], // +1 court Sat/Sun morning
@@ -573,7 +580,8 @@ const LOC_COLORS = { satc: '#2563eb', pharr: '#16a34a', wilco: '#d97706' };
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-const COACHES = [
+// Defaults — actual roster loaded from KV at boot (see hydrateConfig).
+let COACHES = [
   { id:  1, name: 'Aaron',     locs: ['satc'] },
   { id:  2, name: 'Augusto',   locs: ['satc'] },
   { id:  3, name: 'Chelsea',   locs: ['satc'] },
@@ -802,6 +810,112 @@ function persistScope()   { try { localStorage.setItem('coach_scope_v1', JSON.st
 function persistActive() {
   if (activeScope === 'current') persistCurrent();
   else persistDrafts();
+}
+
+// ── CONFIG (coaches roster + capacities) ──────────────────────────────────────
+const DEFAULT_COACHES = JSON.parse(JSON.stringify(COACHES));
+const DEFAULT_LOCS    = JSON.parse(JSON.stringify(LOCS));
+
+function hydrateConfig() {
+  // Coaches: if KV has any, use it. Otherwise seed from defaults and persist.
+  let storedCoaches = [];
+  try { storedCoaches = JSON.parse(kv.getItem('coach_roster_v1')) || []; } catch(e) {}
+  if (Array.isArray(storedCoaches) && storedCoaches.length) {
+    COACHES = storedCoaches;
+  } else {
+    COACHES = JSON.parse(JSON.stringify(DEFAULT_COACHES));
+    kv.setItem('coach_roster_v1', JSON.stringify(COACHES));
+  }
+
+  // Locations: ditto. Stored as { satc: { name, morning:[...7], evening:[...7] }, ... }
+  let storedLocs = {};
+  try { storedLocs = JSON.parse(kv.getItem('coach_locations_v1')) || {}; } catch(e) {}
+  if (storedLocs && Object.keys(storedLocs).length) {
+    LOCS = storedLocs;
+  } else {
+    LOCS = JSON.parse(JSON.stringify(DEFAULT_LOCS));
+    kv.setItem('coach_locations_v1', JSON.stringify(LOCS));
+  }
+}
+
+function saveCoaches() { kv.setItem('coach_roster_v1', JSON.stringify(COACHES)); }
+function saveLocs()    { kv.setItem('coach_locations_v1', JSON.stringify(LOCS)); }
+
+function nextCoachId() {
+  return (COACHES.reduce((m, c) => Math.max(m, c.id), 0) || 0) + 1;
+}
+
+function addCoach(name, locs) {
+  if (!name || !name.trim()) return;
+  COACHES.push({ id: nextCoachId(), name: name.trim(), locs: locs.slice() });
+  saveCoaches();
+  render();
+}
+
+function deleteCoach(coachId) {
+  const c = COACHES.find(x => x.id === coachId); if (!c) return;
+  // Count shifts assigned in current schedule
+  const shiftCount = DAYS.reduce((sum, _, i) => {
+    const s = currentSched[`${coachId}_${i}`] || {};
+    return sum + (s.morning ? 1 : 0) + (s.evening ? 1 : 0);
+  }, 0);
+  const msg = shiftCount
+    ? `Delete ${c.name}? They have ${shiftCount} shift${shiftCount>1?'s':''} on the current schedule. Those entries will also be removed.`
+    : `Delete ${c.name}?`;
+  if (!confirm(msg)) return;
+
+  COACHES = COACHES.filter(x => x.id !== coachId);
+  saveCoaches();
+
+  // Strip their entries from currentSched (always — coach no longer exists)
+  let touchedCurrent = false;
+  for (const k of Object.keys(currentSched)) {
+    if (k.startsWith(coachId + '_')) { delete currentSched[k]; touchedCurrent = true; }
+  }
+  if (touchedCurrent) persistCurrent();
+
+  // Strip from drafts too
+  let touchedDrafts = false;
+  for (const d of drafts) {
+    for (const k of Object.keys(d.schedule)) {
+      if (k.startsWith(coachId + '_')) { delete d.schedule[k]; touchedDrafts = true; }
+    }
+  }
+  if (touchedDrafts) persistDrafts();
+
+  // And from locks
+  if (lockedCoaches.delete(coachId) | [...lockedShifts].some(k => k.startsWith(coachId + '_'))) {
+    lockedShifts = new Set([...lockedShifts].filter(k => !k.startsWith(coachId + '_')));
+    kv.setItem('coach_locks_v1', JSON.stringify({ coaches: [...lockedCoaches], shifts: [...lockedShifts] }));
+  }
+
+  if (selectedCoachId === coachId) {
+    selectedCoachId = COACHES[0]?.id || 0;
+  }
+  render();
+}
+
+function setCoachLocs(coachId, locs) {
+  const c = COACHES.find(x => x.id === coachId); if (!c) return;
+  c.locs = locs.slice();
+  saveCoaches();
+  render();
+}
+
+function renameCoach(coachId, newName) {
+  const c = COACHES.find(x => x.id === coachId); if (!c) return;
+  if (!newName || !newName.trim()) return;
+  c.name = newName.trim();
+  saveCoaches();
+  render();
+}
+
+function setCap(locKey, dayIdx, shift, value) {
+  const v = Math.max(0, parseInt(value, 10) || 0);
+  if (!LOCS[locKey]) return;
+  LOCS[locKey][shift][dayIdx] = v;
+  saveLocs();
+  render();
 }
 
 function loadSched() {
@@ -1189,6 +1303,7 @@ function render() {
   else if (activeTab === 'location')  renderLocation();
   else if (activeTab === 'coach')     renderCoach();
   else if (activeTab === 'requests')  renderRequests();
+  else if (activeTab === 'config')    renderConfig();
 }
 
 // OVERVIEW
@@ -1499,6 +1614,147 @@ function renderRequests() {
 function setReqFilter(f) { reqFilter = f; renderRequests(); }
 function reqSetStatus(id, s) { updateReqStatus(id, s); updateReqBadge(); renderRequests(); }
 function reqDelete(id) { if (confirm('Delete this item?')) { deleteRequest(id); updateReqBadge(); renderRequests(); } }
+
+// ── CONFIG TAB ────────────────────────────────────────────────────────────────
+let _newCoachDraft = { name: '', locs: [] };
+
+function renderConfig() {
+  const sortedCoaches = COACHES.slice().sort((a,b) => a.name.localeCompare(b.name));
+  const allLocs = Object.keys(LOCS); // satc, pharr, wilco
+
+  // Coach roster
+  const coachRows = sortedCoaches.map(c => {
+    const shiftCount = DAYS.reduce((sum, _, i) => {
+      const s = currentSched[`${c.id}_${i}`] || {};
+      return sum + (s.morning ? 1 : 0) + (s.evening ? 1 : 0);
+    }, 0);
+    const locChips = allLocs.map(lk => {
+      const sel = c.locs.includes(lk);
+      return `<button class="loc-opt ${lk} ${sel?'sel':''}" style="padding:3px 10px;font-size:11px"
+        onclick="toggleCoachLoc(${c.id},'${lk}')">${LOCS[lk].name}</button>`;
+    }).join('');
+    return `<tr>
+      <td style="padding:8px 10px">
+        <input class="form-input" style="padding:4px 8px;font-size:13px;max-width:160px"
+          value="${c.name.replace(/"/g,'&quot;')}"
+          onchange="renameCoach(${c.id}, this.value)">
+      </td>
+      <td style="padding:8px 10px">
+        <div style="display:flex;gap:4px;flex-wrap:wrap">${locChips}</div>
+      </td>
+      <td style="padding:8px 10px;font-size:12px;color:var(--muted)">${shiftCount}</td>
+      <td style="padding:8px 10px;text-align:right">
+        <button class="scope-btn danger" onclick="deleteCoach(${c.id})">Delete</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const draftLocChips = allLocs.map(lk => {
+    const sel = _newCoachDraft.locs.includes(lk);
+    return `<button class="loc-opt ${lk} ${sel?'sel':''}" style="padding:5px 12px;font-size:12px"
+      onclick="toggleNewCoachLoc('${lk}')">${LOCS[lk].name}</button>`;
+  }).join('');
+
+  const coachSection = `
+    <div class="loc-card" style="background:var(--surface)">
+      <div class="lc-head" style="background:var(--brand-navy,#1e293b)"><div class="lc-title">Coaches (${COACHES.length})</div></div>
+      <div style="padding:0">
+        <div style="overflow-x:auto">
+          <table style="width:100%">
+            <thead>
+              <tr>
+                <th style="padding:10px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);background:#f8fafc;border-bottom:1px solid var(--border)">Name</th>
+                <th style="padding:10px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);background:#f8fafc;border-bottom:1px solid var(--border)">Locations</th>
+                <th style="padding:10px 10px;text-align:left;font-size:11px;text-transform:uppercase;color:var(--muted);background:#f8fafc;border-bottom:1px solid var(--border)">Shifts</th>
+                <th style="padding:10px 10px;background:#f8fafc;border-bottom:1px solid var(--border)"></th>
+              </tr>
+            </thead>
+            <tbody>${coachRows || `<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--muted)">No coaches yet.</td></tr>`}</tbody>
+          </table>
+        </div>
+        <div style="padding:14px 16px;border-top:1px solid var(--border);background:#f8fafc;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <strong style="font-size:13px">+ Add coach:</strong>
+          <input id="new-coach-name" class="form-input" style="padding:6px 10px;font-size:13px;max-width:180px"
+            placeholder="Name" value="${_newCoachDraft.name.replace(/"/g,'&quot;')}"
+            oninput="_newCoachDraft.name=this.value">
+          <div style="display:flex;gap:4px">${draftLocChips}</div>
+          <button class="scope-btn primary" onclick="submitNewCoach()">Add</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Capacities
+  const capCards = allLocs.map(lk => {
+    const ld = LOCS[lk];
+    const rowsHTML = ['morning','evening'].map(shift => {
+      const cells = DAYS.map((d, i) => {
+        const v = ld[shift][i];
+        return `<td style="padding:6px 4px;text-align:center;border-right:1px solid var(--border)">
+          <input type="number" min="0" value="${v}"
+            style="width:48px;padding:3px 4px;text-align:center;font-size:13px;border:1px solid var(--border);border-radius:4px"
+            onchange="setCap('${lk}',${i},'${shift}',this.value)">
+        </td>`;
+      }).join('');
+      const s = shift === 'morning' ? 'm' : 'e';
+      const sLabel = shift === 'morning' ? 'Morning' : 'Evening';
+      return `<tr>
+        <td class="cov-label ${s}" style="padding:8px 10px;font-size:12px">${sLabel}</td>
+        ${cells}
+      </tr>`;
+    }).join('');
+
+    return `<div class="loc-card">
+      <div class="lc-head ${lk}"><div class="lc-title">${ld.name}</div><div class="lc-courts">Court capacity per day</div></div>
+      <div style="overflow-x:auto;background:var(--surface)">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="padding:8px 10px;background:#f8fafc;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;color:var(--muted);text-align:left">Shift</th>
+              ${DAYS.map(d => `<th style="padding:8px 4px;background:#f8fafc;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);text-align:center">${d.slice(0,3)}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>${rowsHTML}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('pane-config').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:24px">
+      <div>
+        <h2 style="font-size:16px;font-weight:700;margin-bottom:10px">Coach Roster</h2>
+        ${coachSection}
+      </div>
+      <div>
+        <h2 style="font-size:16px;font-weight:700;margin-bottom:10px">Court Capacities</h2>
+        <div style="display:flex;flex-direction:column;gap:14px">${capCards}</div>
+      </div>
+    </div>
+  `;
+}
+
+function toggleNewCoachLoc(lk) {
+  const i = _newCoachDraft.locs.indexOf(lk);
+  if (i >= 0) _newCoachDraft.locs.splice(i, 1);
+  else _newCoachDraft.locs.push(lk);
+  renderConfig();
+}
+
+function submitNewCoach() {
+  const name = (document.getElementById('new-coach-name')?.value || _newCoachDraft.name || '').trim();
+  if (!name) { alert('Enter a name first.'); return; }
+  addCoach(name, _newCoachDraft.locs);
+  _newCoachDraft = { name: '', locs: [] };
+  renderConfig();
+}
+
+function toggleCoachLoc(coachId, lk) {
+  const c = COACHES.find(x => x.id === coachId); if (!c) return;
+  const i = c.locs.indexOf(lk);
+  const next = i >= 0 ? c.locs.filter(x => x !== lk) : [...c.locs, lk];
+  setCoachLocs(coachId, next);
+}
 
 // ── REQUEST MODAL ─────────────────────────────────────────────────────────────
 function openReqModal() {
@@ -1935,7 +2191,7 @@ function bgClose(e)   { if (e.target.classList.contains('overlay')) closeModal()
 function setTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  ['overview', 'location', 'coach', 'requests'].forEach(t => {
+  ['overview', 'location', 'coach', 'requests', 'config'].forEach(t => {
     document.getElementById(`pane-${t}`).classList.toggle('hidden', t !== tab);
   });
   render();
@@ -1985,7 +2241,10 @@ async function importLocalStorage() {
     <div id="pane-location" class="hidden"></div>
     <div id="pane-coach"     class="hidden"></div>
     <div id="pane-requests"  class="hidden"></div>
+    <div id="pane-config"    class="hidden"></div>
   `;
+
+  hydrateConfig();
 
   // Show import banner if cloud is empty but localStorage has data
   if (kv.isRemoteEmpty() && localStorage.getItem('coach_template_v1')) {

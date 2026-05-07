@@ -1,4 +1,4 @@
-const KEYS = ['current_schedule', 'drafts', 'locks', 'requests'];
+const KEYS = ['current_schedule', 'drafts', 'locks', 'requests', 'coaches', 'locations'];
 
 export async function onRequestGet({ env }) {
   const { results } = await env.DB.prepare(

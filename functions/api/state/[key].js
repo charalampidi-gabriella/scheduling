@@ -1,4 +1,4 @@
-const ALLOWED = new Set(['current_schedule', 'drafts', 'locks', 'requests']);
+const ALLOWED = new Set(['current_schedule', 'drafts', 'locks', 'requests', 'coaches', 'locations']);
 
 export async function onRequestPut({ params, request, env }) {
   const key = params.key;
