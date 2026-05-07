@@ -1,0 +1,1817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coach Scheduler</title>
+<style>
+:root {
+  --satc:    #2563eb; --satc-bg:  #eff6ff; --satc-b:  #bfdbfe;
+  --pharr:   #16a34a; --pharr-bg: #f0fdf4; --pharr-b: #bbf7d0;
+  --wilco:   #d97706; --wilco-bg: #fffbeb; --wilco-b: #fde68a;
+  --m-color: #7c3aed; --m-bg:     #f5f3ff;
+  --e-color: #0891b2; --e-bg:     #ecfeff;
+  --bg: #f1f5f9; --surface: #fff; --border: #e2e8f0;
+  --text: #0f172a; --muted: #64748b; --r: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* HEADER */
+#header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; height: 58px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.app-name { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
+.app-sub  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* TABS */
+#tabs {
+  position: sticky; top: 58px; z-index: 99;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 0 24px; display: flex;
+}
+.tab-btn {
+  padding: 13px 18px; border: none; background: none; cursor: pointer;
+  font-size: 14px; font-weight: 500; color: var(--muted);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: all 0.15s;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--satc); border-bottom-color: var(--satc); }
+
+/* MAIN */
+#main { padding: 24px; }
+.hidden { display: none !important; }
+
+/* FILTERS */
+.filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+.fchip {
+  padding: 5px 14px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+}
+.fchip:hover { border-color: #94a3b8; }
+.fchip.active   { background: #1e293b; color: white; border-color: #1e293b; }
+.fchip.s.active { background: var(--satc);  border-color: var(--satc); }
+.fchip.p.active { background: var(--pharr); border-color: var(--pharr); }
+.fchip.w.active { background: var(--wilco); border-color: var(--wilco); }
+
+/* OVERVIEW TABLE */
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; }
+thead th {
+  background: #f8fafc; padding: 11px 14px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--muted); text-align: left; border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: #f8fafc; }
+
+.coach-col { min-width: 155px; }
+.cc-name   { font-size: 13px; font-weight: 700; }
+.cc-locs   { display: flex; gap: 4px; margin-top: 3px; }
+.lpip {
+  font-size: 10px; font-weight: 700; padding: 1px 5px;
+  border-radius: 3px; letter-spacing: 0.03em;
+}
+.lpip.satc  { background: var(--satc-bg);  color: var(--satc); }
+.lpip.pharr { background: var(--pharr-bg); color: var(--pharr); }
+.lpip.wilco { background: var(--wilco-bg); color: var(--wilco); }
+
+.day-col { min-width: 95px; cursor: pointer; }
+.cell-inner { display: flex; flex-direction: column; gap: 3px; }
+.sbadge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px; border-radius: 4px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.sbadge.m { background: var(--m-bg); color: var(--m-color); }
+.sbadge.e { background: var(--e-bg); color: var(--e-color); }
+.sbadge .sloc { font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 2px; color: white; }
+.sbadge.satc  .sloc { background: var(--satc); }
+.sbadge.pharr .sloc { background: var(--pharr); }
+.sbadge.wilco .sloc { background: var(--wilco); }
+.cell-empty { color: #cbd5e1; font-size: 12px; }
+.cell-add   { color: #94a3b8; font-size: 11px; margin-top: 2px; opacity: 0; transition: opacity 0.1s; }
+.day-col:hover .cell-add { opacity: 1; }
+
+/* EDIT MODE */
+.edit-bar {
+  position: sticky; bottom: 0; z-index: 90;
+  background: #1e293b; color: white;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 24px; gap: 16px;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.2);
+}
+.edit-bar-info { font-size: 14px; font-weight: 500; }
+.edit-bar-info span { background: #f59e0b; color: #1e293b; border-radius: 20px; padding: 2px 10px; font-weight: 700; font-size: 13px; margin-left: 8px; }
+.edit-bar-btns { display: flex; gap: 8px; }
+.tbl-wrap.in-edit { border-color: #f59e0b; box-shadow: 0 0 0 2px #fde68a; }
+.sbadge.picked {
+  outline: 2px solid #f59e0b; outline-offset: 2px;
+  box-shadow: 0 0 8px rgba(245,158,11,0.5);
+  cursor: grab;
+}
+.sbadge.in-edit-mode { cursor: pointer; }
+.sbadge.in-edit-mode:hover { opacity: 0.75; }
+.day-col.drop-target { background: rgba(22,163,74,0.06) !important; outline: 1.5px dashed #16a34a; outline-offset: -2px; cursor: cell; }
+.day-col.drop-invalid { cursor: not-allowed; }
+.from-tag { font-size: 10px; color: var(--muted); margin-top: 1px; font-style: italic; }
+.sbadge.moved { opacity: 0.9; }
+
+/* BY LOCATION */
+.day-selector { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+.day-tab {
+  padding: 7px 18px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; color: var(--muted);
+}
+.day-tab:hover { border-color: #94a3b8; color: var(--text); }
+.day-tab.active { background: #1e293b; color: white; border-color: #1e293b; }
+
+.loc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+@media (max-width: 960px) { .loc-grid { grid-template-columns: 1fr; } }
+.loc-card { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.lc-head  { padding: 16px 20px; color: white; display: flex; align-items: center; justify-content: space-between; }
+.lc-head.satc  { background: var(--satc); }
+.lc-head.pharr { background: var(--pharr); }
+.lc-head.wilco { background: var(--wilco); }
+.lc-title  { font-size: 22px; font-weight: 800; }
+.lc-courts { font-size: 13px; opacity: 0.85; }
+.lc-body   { background: var(--surface); }
+.lc-shift  { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.lc-shift:last-child { border-bottom: none; }
+.lc-shift-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.lc-shift-label    { font-size: 13px; font-weight: 700; }
+.lc-shift-label.m  { color: var(--m-color); }
+.lc-shift-label.e  { color: var(--e-color); }
+.lc-shift-time     { font-size: 12px; color: var(--muted); }
+.cap-bar  { height: 5px; background: var(--border); border-radius: 3px; margin-bottom: 8px; overflow: hidden; }
+.cap-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.cap-fill.satc  { background: var(--satc); }
+.cap-fill.pharr { background: var(--pharr); }
+.cap-fill.wilco { background: var(--wilco); }
+.cap-fill.over  { background: #ef4444; }
+.cap-label      { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 8px; }
+.cap-label.over { color: #dc2626; }
+.lc-names { display: flex; flex-direction: column; gap: 3px; }
+.lc-name  { font-size: 13px; color: var(--text); }
+.lc-empty { font-size: 12px; color: #cbd5e1; font-style: italic; }
+
+/* COACH VIEW */
+.coach-picker-wrap { margin-bottom: 20px; }
+.coach-picker-wrap select {
+  padding: 9px 14px; border: 1px solid var(--border); border-radius: 8px;
+  font-size: 14px; background: var(--surface); min-width: 250px; cursor: pointer;
+}
+.coach-banner {
+  display: flex; align-items: center; gap: 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 16px 20px; margin-bottom: 20px;
+}
+.coach-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 800; color: white; flex-shrink: 0;
+}
+.coach-banner-name { font-size: 17px; font-weight: 700; }
+.coach-banner-locs { display: flex; gap: 6px; margin-top: 4px; align-items: center; }
+.hybrid-tag { font-size: 11px; color: var(--muted); }
+
+.week-grid { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.week-row {
+  display: grid; grid-template-columns: 110px 1fr 1fr auto;
+  padding: 13px 20px; border-bottom: 1px solid var(--border);
+  align-items: center; gap: 16px;
+}
+.week-row:last-child { border-bottom: none; }
+.week-row:hover { background: var(--bg); }
+.wr-day-name  { font-size: 14px; font-weight: 700; }
+.wr-shift     { display: flex; flex-direction: column; gap: 4px; }
+.no-shift-lbl { font-size: 12px; color: #cbd5e1; }
+.wr-edit-btn  {
+  padding: 6px 12px; border-radius: 6px;
+  border: 1px solid var(--border); background: none;
+  font-size: 12px; cursor: pointer; color: var(--muted); white-space: nowrap;
+}
+.wr-edit-btn:hover { background: var(--bg); color: var(--text); }
+
+/* MODAL */
+.overlay {
+  position: fixed; inset: 0; background: rgba(15,23,42,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; padding: 20px;
+}
+.modal {
+  background: var(--surface); border-radius: 14px;
+  width: 420px; max-width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  overflow: hidden;
+}
+.mhead       { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.mhead-title { font-size: 16px; font-weight: 800; }
+.mhead-sub   { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.mbody { padding: 20px 24px; }
+.mfoot { padding: 14px 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.mfoot-right { display: flex; gap: 8px; }
+
+.sblock { margin-bottom: 18px; }
+.sblock:last-child { margin-bottom: 0; }
+.sblock-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-radius: 8px; cursor: pointer; user-select: none;
+  margin-bottom: 10px;
+}
+.sblock-head.m { background: var(--m-bg); }
+.sblock-head.e { background: var(--e-bg); }
+.sblock-title   { font-size: 14px; font-weight: 700; }
+.sblock-title.m { color: var(--m-color); }
+.sblock-title.e { color: var(--e-color); }
+.sblock-time    { font-size: 12px; color: var(--muted); }
+
+.toggle {
+  width: 42px; height: 24px; border-radius: 12px;
+  background: #e2e8f0; cursor: pointer; position: relative;
+  transition: background 0.2s; flex-shrink: 0; border: none;
+}
+.toggle.on { background: var(--satc); }
+.toggle::after {
+  content: ''; position: absolute;
+  width: 18px; height: 18px; border-radius: 50%; background: white;
+  top: 3px; left: 3px; transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+.toggle.on::after { transform: translateX(18px); }
+
+.loc-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+.loc-opt {
+  padding: 7px 16px; border-radius: 7px;
+  border: 2px solid transparent; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.loc-opt.satc  { background: var(--satc-bg);  color: var(--satc);  border-color: var(--satc-b); }
+.loc-opt.pharr { background: var(--pharr-bg); color: var(--pharr); border-color: var(--pharr-b); }
+.loc-opt.wilco { background: var(--wilco-bg); color: var(--wilco); border-color: var(--wilco-b); }
+.loc-opt.sel.satc  { background: var(--satc);  color: white; border-color: var(--satc); }
+.loc-opt.sel.pharr { background: var(--pharr); color: white; border-color: var(--pharr); }
+.loc-opt.sel.wilco { background: var(--wilco); color: white; border-color: var(--wilco); }
+.loc-opt:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.btn         { padding: 8px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+.btn-primary { background: var(--satc); color: white; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-ghost   { background: none; border: 1px solid var(--border); color: var(--text); }
+.btn-ghost:hover { background: var(--bg); }
+.btn-red     { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; }
+.btn-red:hover { background: #fca5a5; }
+
+/* ── LOCKING ── */
+.lock-btn {
+  background: none; border: none; cursor: pointer; padding: 2px 4px;
+  color: #cbd5e1; font-size: 13px; line-height: 1; border-radius: 4px;
+  transition: all 0.15s; flex-shrink: 0;
+}
+.lock-btn:hover { color: #64748b; background: var(--border); }
+.lock-btn.locked { color: #f59e0b; }
+.coach-col-inner { display: flex; align-items: flex-start; gap: 6px; }
+tr.coach-locked > td { background: #fffbeb !important; }
+tr.coach-locked > td.t-today { background: #fef9c3 !important; }
+.sbadge.shift-locked { outline: 2px solid #f59e0b; outline-offset: 1px; }
+.shift-lock-wrap { display: inline-flex; align-items: center; gap: 3px; }
+.shift-lock-icon {
+  font-size: 10px; color: #f59e0b; cursor: pointer; opacity: 0;
+  transition: opacity 0.1s; line-height: 1;
+}
+.day-col:hover .shift-lock-icon { opacity: 1; }
+.shift-lock-icon.locked { opacity: 1; }
+
+/* ── PLANNER TAB ── */
+.planner-layout { display: grid; grid-template-columns: 260px 1fr; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .planner-layout { grid-template-columns: 1fr; } }
+
+.lock-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.lock-panel-head {
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;
+}
+.lock-all-btns { display: flex; gap: 6px; }
+.mini-btn {
+  padding: 3px 8px; border-radius: 5px; font-size: 11px; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border); background: none; color: var(--muted);
+}
+.mini-btn:hover { background: var(--bg); }
+.lock-coach-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 16px; border-bottom: 1px solid var(--border); gap: 8px;
+}
+.lock-coach-row:last-child { border-bottom: none; }
+.lock-coach-row:hover { background: var(--bg); }
+.lock-coach-name { font-size: 13px; font-weight: 500; }
+.lock-coach-locs { display: flex; gap: 3px; margin-top: 2px; }
+
+.coverage-panel { display: flex; flex-direction: column; gap: 16px; }
+.coverage-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.coverage-head {
+  padding: 12px 16px; color: white; font-weight: 800; font-size: 15px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.coverage-head.satc  { background: var(--satc); }
+.coverage-head.pharr { background: var(--pharr); }
+.coverage-head.wilco { background: var(--wilco); }
+.coverage-grid-inner { display: grid; grid-template-columns: 90px repeat(7,1fr); }
+.cov-hdr { background: #f8fafc; padding: 8px 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); text-align: center; }
+.cov-hdr:last-child { border-right: none; }
+.cov-label { padding: 10px 8px; font-size: 11px; font-weight: 700; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); display: flex; align-items: center; }
+.cov-label.m { color: var(--m-color); background: var(--m-bg); }
+.cov-label.e { color: var(--e-color); background: var(--e-bg); }
+.cov-cell {
+  padding: 8px 6px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  text-align: center; font-size: 12px;
+}
+.cov-cell:last-child { border-right: none; }
+.cov-row:last-child .cov-cell { border-bottom: none; }
+.cov-row:last-child .cov-label { border-bottom: none; }
+.cov-num { font-size: 13px; font-weight: 800; }
+.cov-cap { font-size: 10px; color: var(--muted); }
+.cov-cell.full    { background: #f0fdf4; }
+.cov-cell.partial { background: #fffbeb; }
+.cov-cell.gap     { background: #fff1f2; }
+.cov-cell.zero    { background: #f8fafc; }
+.cov-locked   { color: #16a34a; }
+.cov-unlocked { color: #64748b; }
+.cov-gap-num  { color: #dc2626; font-weight: 800; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+/* SCOPE BAR */
+#scope-bar {
+  position: sticky; top: 58px; z-index: 99;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 10px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+#scope-bar.draft { background: #fff7ed; border-bottom-color: #fdba74; }
+.scope-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.scope-select {
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13px; background: var(--surface); cursor: pointer; font-weight: 600;
+}
+#scope-bar.draft .scope-select { border-color: #f59e0b; background: #fff; }
+.scope-tag {
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.scope-tag.ro    { background: #e0f2fe; color: #075985; }
+.scope-tag.draft { background: #fef3c7; color: #92400e; }
+.scope-btns { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.scope-btn {
+  padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+}
+.scope-btn:hover { background: var(--bg); }
+.scope-btn.primary { background: #16a34a; color: white; border-color: #16a34a; }
+.scope-btn.primary:hover { background: #15803d; }
+.scope-btn.danger  { color: #dc2626; border-color: #fca5a5; }
+.scope-btn.danger:hover { background: #fee2e2; }
+#tabs.with-scope { top: calc(58px + 47px); }
+
+/* REQUESTS */
+.req-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+.req-filters { display: flex; gap: 6px; }
+.req-list { display: flex; flex-direction: column; gap: 10px; }
+.req-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 16px 20px;
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 12px; align-items: start;
+}
+.req-card.status-pending  { border-left: 4px solid #f59e0b; }
+.req-card.status-approved { border-left: 4px solid #16a34a; }
+.req-card.status-denied   { border-left: 4px solid #dc2626; }
+.req-card.status-done     { border-left: 4px solid #6366f1; }
+.req-coach { font-size: 14px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.req-text  { font-size: 14px; color: var(--text); margin-bottom: 6px; }
+.req-note  { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 4px; }
+.req-date  { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.req-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: flex-start; }
+.req-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.req-badge.pending  { background: #fef3c7; color: #92400e; }
+.req-badge.approved { background: #dcfce7; color: #166534; }
+.req-badge.denied   { background: #fee2e2; color: #991b1b; }
+.req-badge.done     { background: #ede9fe; color: #4c1d95; }
+.req-btn {
+  padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  cursor: pointer; border: 1px solid var(--border); background: none; color: var(--muted);
+  white-space: nowrap;
+}
+.req-btn:hover { background: var(--bg); color: var(--text); }
+.req-btn.approve { border-color: #bbf7d0; color: #16a34a; }
+.req-btn.approve:hover { background: #f0fdf4; }
+.req-btn.deny    { border-color: #fca5a5; color: #dc2626; }
+.req-btn.deny:hover { background: #fee2e2; }
+.req-btn.done-btn { border-color: #c4b5fd; color: #6366f1; }
+.req-btn.done-btn:hover { background: #ede9fe; }
+.req-empty { text-align: center; padding: 48px 24px; color: var(--muted); font-size: 14px; }
+
+/* Request modal extras */
+.form-row { margin-bottom: 16px; }
+.form-label { font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block; }
+.form-select, .form-textarea, .form-input {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border);
+  border-radius: 8px; font-size: 14px; background: var(--surface);
+  font-family: inherit; color: var(--text);
+}
+.form-textarea { resize: vertical; min-height: 80px; }
+.form-select:focus, .form-textarea:focus, .form-input:focus {
+  outline: none; border-color: var(--satc);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div>
+    <div class="app-name">Coach Scheduler</div>
+    <div class="app-sub">Weekly template &mdash; SATC &middot; Pharr &middot; Wilco</div>
+  </div>
+  <div id="sync-indicator" style="font-size:12px;font-weight:600;color:#16a34a">✓ Synced</div>
+</div>
+<div id="import-banner" class="hidden" style="background:#fef3c7;border-bottom:1px solid #fde68a;padding:10px 24px;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+  <span>📥 Local data found in this browser. The cloud database is empty — import it?</span>
+  <span style="display:flex;gap:8px">
+    <button class="scope-btn primary" onclick="importLocalStorage()">Import to Cloud</button>
+    <button class="scope-btn" onclick="document.getElementById('import-banner').classList.add('hidden')">Dismiss</button>
+  </span>
+</div>
+
+<div id="scope-bar"></div>
+
+<div id="tabs" class="with-scope">
+  <button class="tab-btn active" data-tab="overview" onclick="setTab('overview')">Overview</button>
+  <button class="tab-btn"        data-tab="location" onclick="setTab('location')">By Location</button>
+  <button class="tab-btn"        data-tab="coach"    onclick="setTab('coach')">Coach</button>
+  <button class="tab-btn"        data-tab="requests" onclick="setTab('requests')" id="req-tab">Requests</button>
+</div>
+
+<div id="main">
+  <div id="pane-overview"></div>
+  <div id="pane-location" class="hidden"></div>
+  <div id="pane-coach"     class="hidden"></div>
+  <div id="pane-requests"  class="hidden"></div>
+</div>
+
+<div id="modal-root"></div>
+
+<script>
+// ── REMOTE KV (D1-backed, mirrors what was localStorage) ─────────────────────
+const KV_KEYS = ['current_schedule','drafts','locks','requests'];
+const LOCAL_TO_REMOTE = {
+  coach_template_v1: 'current_schedule',
+  coach_drafts_v1:   'drafts',
+  coach_locks_v1:    'locks',
+  coach_requests_v1: 'requests',
+};
+const kv = {
+  cache: {},        // localStorage-key → JSON string
+  pending: {},      // remoteKey → pending timeout id
+  inflight: 0,      // count of in-flight writes (for UI)
+  lastError: null,
+  async bootstrap() {
+    const r = await fetch('/api/state', { cache: 'no-store' });
+    if (!r.ok) throw new Error('Failed to load state: ' + r.status);
+    const data = await r.json();
+    this.cache.coach_template_v1 = JSON.stringify(data.current_schedule ?? {});
+    this.cache.coach_drafts_v1   = JSON.stringify(data.drafts ?? []);
+    this.cache.coach_locks_v1    = JSON.stringify(data.locks ?? { coaches:[], shifts:[] });
+    this.cache.coach_requests_v1 = JSON.stringify(data.requests ?? []);
+  },
+  isRemoteEmpty() {
+    const sched = JSON.parse(this.cache.coach_template_v1 || '{}');
+    const drafts = JSON.parse(this.cache.coach_drafts_v1 || '[]');
+    const reqs = JSON.parse(this.cache.coach_requests_v1 || '[]');
+    return Object.keys(sched).length === 0 && drafts.length === 0 && reqs.length === 0;
+  },
+  getItem(k) { return this.cache[k] ?? null; },
+  setItem(k, v) {
+    this.cache[k] = v;
+    const remoteKey = LOCAL_TO_REMOTE[k];
+    if (!remoteKey) return;
+    clearTimeout(this.pending[remoteKey]);
+    this.pending[remoteKey] = setTimeout(() => this._flush(remoteKey, v), 250);
+  },
+  async _flush(remoteKey, value) {
+    this.inflight++;
+    updateSyncIndicator();
+    try {
+      const r = await fetch('/api/state/' + remoteKey, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: value,
+      });
+      if (!r.ok) throw new Error('PUT ' + remoteKey + ' → ' + r.status);
+      this.lastError = null;
+    } catch (e) {
+      this.lastError = e.message;
+      console.error('[kv] save failed', remoteKey, e);
+    } finally {
+      this.inflight--;
+      updateSyncIndicator();
+    }
+  },
+  async flushAll() {
+    // force any pending debounced writes to fire now
+    for (const remoteKey of Object.keys(this.pending)) {
+      clearTimeout(this.pending[remoteKey]);
+      const localKey = Object.keys(LOCAL_TO_REMOTE).find(k => LOCAL_TO_REMOTE[k] === remoteKey);
+      if (localKey && this.cache[localKey] != null) {
+        await this._flush(remoteKey, this.cache[localKey]);
+      }
+    }
+  },
+};
+function updateSyncIndicator() {
+  const el = document.getElementById('sync-indicator');
+  if (!el) return;
+  if (kv.lastError) { el.textContent = '⚠ Sync failed'; el.style.color = '#dc2626'; }
+  else if (kv.inflight > 0) { el.textContent = 'Saving…'; el.style.color = '#64748b'; }
+  else { el.textContent = '✓ Synced'; el.style.color = '#16a34a'; }
+}
+
+// ── DATA ──────────────────────────────────────────────────────────────────────
+// Court capacity per day (index 0=Mon … 6=Sun) per shift
+const LOCS = {
+  satc:  {
+    name: 'SATC',
+    morning: [5, 5, 5, 5, 5, 6, 6], // +1 court Sat/Sun morning
+    evening: [5, 5, 5, 5, 5, 5, 5],
+  },
+  pharr: {
+    name: 'Pharr',
+    morning: [2, 3, 3, 3, 2, 5, 5], // variable weekday; +1 court Sat/Sun morning
+    evening: [4, 4, 4, 4, 3, 2, 2], // Fri=3, weekend=2
+  },
+  wilco: {
+    name: 'Wilco',
+    morning: [0, 1, 1, 0, 0, 4, 4],
+    evening: [2, 4, 3, 4, 2, 2, 3],
+  },
+};
+function getCap(locKey, dayIdx, shift) {
+  return LOCS[locKey][shift][dayIdx];
+}
+const LOC_COLORS = { satc: '#2563eb', pharr: '#16a34a', wilco: '#d97706' };
+
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+const COACHES = [
+  { id:  1, name: 'Aaron',     locs: ['satc'] },
+  { id:  2, name: 'Augusto',   locs: ['satc'] },
+  { id:  3, name: 'Chelsea',   locs: ['satc'] },
+  { id:  4, name: 'Chris Mc',  locs: ['wilco'] },
+  { id:  5, name: 'Dean',      locs: ['satc'] },
+  { id:  6, name: 'Evan',      locs: ['satc', 'pharr'] },
+  { id:  7, name: 'Evie',      locs: ['satc', 'pharr'] },
+  { id:  8, name: 'Geronimo',  locs: ['satc'] },
+  { id:  9, name: 'Hemanshu',  locs: ['satc'] },
+  { id: 10, name: 'James',     locs: ['pharr'] },
+  { id: 11, name: 'Jason',     locs: ['pharr'] },
+  { id: 12, name: 'Jorge',     locs: ['wilco'] },
+  { id: 13, name: 'Kent',      locs: ['satc'] },
+  { id: 14, name: 'Kevin',     locs: ['wilco'] },
+  { id: 15, name: 'Kolton',    locs: ['satc'] },
+  { id: 16, name: 'Mark',      locs: ['pharr'] },
+  { id: 17, name: 'Mateo',     locs: ['satc'] },
+  { id: 18, name: 'Natalie',   locs: ['wilco'] },
+  { id: 19, name: 'Nick',      locs: ['satc'] },
+  { id: 20, name: 'Nolan',     locs: ['satc'] },
+  { id: 21, name: 'Oleg',      locs: ['pharr'] },
+  { id: 22, name: 'Rhea',      locs: ['pharr'] },
+  { id: 23, name: 'Shawn',     locs: [] },
+  { id: 24, name: 'Tim',       locs: ['pharr'] },
+  { id: 25, name: 'Tom',       locs: ['satc'] },
+  { id: 26, name: 'Val',       locs: ['satc'] },
+  { id: 27, name: 'Eli',       locs: ['pharr'] },
+  { id: 28, name: 'Davin',     locs: ['wilco'] },
+  { id: 29, name: 'New Hire',  locs: ['satc'] },
+];
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let activeTab       = 'overview';
+let filterLoc       = 'all';
+let selectedCoachId = 1;
+let locDayIdx       = 0;
+let schedule        = {};
+let editMode        = false;
+let pickedShift     = null;  // { coachId, dayIdx, shift, loc }
+let pendingMoves    = [];    // { fromCoachId, fromName, toCoachId, dayIdx, shift, loc }
+let lockedCoaches   = new Set(); // coachIds whose full schedule is locked
+let lockedShifts    = new Set(); // keys: `${coachId}_${dayIdx}_${shift}`
+let requests        = [];
+let reqFilter       = 'all';
+let ms              = null;
+
+// ── SCHEDULE STORE ────────────────────────────────────────────────────────────
+// Pre-built canonical schedules (dayIdx: 0=Mon … 6=Sun)
+const INITIAL_SCHEDULE = {
+  // Chris Mc (id:4) — Mon-Thu evenings; Sat double; Sun morning
+  '4_0': { morning: null,    evening: 'wilco' },
+  '4_1': { morning: null,    evening: 'wilco' },
+  '4_2': { morning: null,    evening: 'wilco' },
+  '4_3': { morning: null,    evening: 'wilco' },
+  '4_5': { morning: 'wilco', evening: 'wilco' },
+  '4_6': { morning: 'wilco', evening: null    },
+  // Jorge (id:12) — Mon-Thu evenings; Sat double; Sun double
+  '12_0': { morning: null,    evening: 'wilco' },
+  '12_1': { morning: null,    evening: 'wilco' },
+  '12_2': { morning: null,    evening: 'wilco' },
+  '12_3': { morning: null,    evening: 'wilco' },
+  '12_5': { morning: 'wilco', evening: 'wilco' },
+  '12_6': { morning: 'wilco', evening: 'wilco' },
+  // Natalie (id:18) — Tue Wed double; Thu evening; Sat morning; Sun double
+  '18_1': { morning: 'wilco', evening: 'wilco' },
+  '18_2': { morning: 'wilco', evening: 'wilco' },
+  '18_3': { morning: null,    evening: 'wilco' },
+  '18_5': { morning: 'wilco', evening: null    },
+  '18_6': { morning: 'wilco', evening: 'wilco' },
+  // Kevin (id:14) — Tue Thu Fri evenings; Sat morning; Sun double
+  '14_1': { morning: null,    evening: 'wilco' },
+  '14_3': { morning: null,    evening: 'wilco' },
+  '14_4': { morning: null,    evening: 'wilco' },
+  '14_5': { morning: 'wilco', evening: null    },
+  '14_6': { morning: 'wilco', evening: 'wilco' },
+  // Davin (id:28) — Fri evening Wilco
+  '28_4': { morning: null, evening: 'wilco' },
+  // Eli (id:27) — Sat Sun mornings Pharr
+  '27_5': { morning: 'pharr', evening: null },
+  '27_6': { morning: 'pharr', evening: null },
+  // Chelsea (id:3) — Sat morning SATC
+  '3_5': { morning: 'satc', evening: null },
+  // Oleg (id:21) — Mon double; Tue Wed Sat evenings; Sun morning; Thu Fri off
+  '21_0': { morning: 'pharr', evening: 'pharr' },
+  '21_1': { morning: null,    evening: 'pharr' },
+  '21_2': { morning: null,    evening: 'pharr' },
+  '21_5': { morning: null,    evening: 'pharr' },
+  '21_6': { morning: 'pharr', evening: null    },
+  // Mark (id:16) — Mon double; Tue Wed Sat Sun mornings; Thu Fri off
+  '16_0': { morning: 'pharr', evening: 'pharr' },
+  '16_1': { morning: 'pharr', evening: null    },
+  '16_2': { morning: 'pharr', evening: null    },
+  '16_5': { morning: 'pharr', evening: null    },
+  '16_6': { morning: 'pharr', evening: null    },
+  // Jason (id:11) — Tue Wed Thu Fri evenings Pharr; Sun double Pharr
+  '11_1': { morning: null,    evening: 'pharr' },
+  '11_2': { morning: null,    evening: 'pharr' },
+  '11_3': { morning: null,    evening: 'pharr' },
+  '11_4': { morning: null,    evening: 'pharr' },
+  '11_6': { morning: 'pharr', evening: 'pharr' },
+  // James (id:10) — Mon evening; Thu morning; Fri double; Sat evening; Sun morning
+  '10_0': { morning: null,    evening: 'pharr' },
+  '10_3': { morning: 'pharr', evening: null    },
+  '10_4': { morning: 'pharr', evening: 'pharr' },
+  '10_5': { morning: null,    evening: 'pharr' },
+  '10_6': { morning: 'pharr', evening: null    },
+  // Tim (id:24) — Wed Thu Fri Sun evenings Pharr; Sat morning Pharr
+  '24_2': { morning: null,    evening: 'pharr' },
+  '24_3': { morning: null,    evening: 'pharr' },
+  '24_4': { morning: null,    evening: 'pharr' },
+  '24_5': { morning: 'pharr', evening: null    },
+  '24_6': { morning: null,    evening: 'pharr' },
+  // Evie (id:7) — hybrid SATC/Pharr
+  // Mon: morning SATC; Tue Wed: morning Pharr; Fri: evening SATC; Sat: morning Pharr; Sun: morning SATC
+  '7_0': { morning: 'satc',  evening: null  },
+  '7_1': { morning: 'pharr', evening: null  },
+  '7_2': { morning: 'pharr', evening: null  },
+  '7_4': { morning: null,    evening: 'satc' },
+  '7_5': { morning: 'pharr', evening: null  },
+  '7_6': { morning: 'satc',  evening: null  },
+  // Evan (id:6) — hybrid SATC/Pharr
+  // Mon: morning SATC + evening Pharr; Tue: double Pharr; Wed: evening Pharr
+  // Thu: double Pharr; Sun: double SATC
+  '6_0': { morning: 'satc',  evening: 'pharr' },
+  '6_1': { morning: 'pharr', evening: 'pharr' },
+  '6_2': { morning: null,    evening: 'pharr' },
+  '6_3': { morning: 'pharr', evening: 'pharr' },
+  '6_6': { morning: 'satc',  evening: 'satc'  },
+  // Aaron (id:1) — mornings: Mon Tue Wed Fri Sat Sun
+  '1_0': { morning: 'satc', evening: null },
+  '1_1': { morning: 'satc', evening: null },
+  '1_2': { morning: 'satc', evening: null },
+  '1_4': { morning: 'satc', evening: null },
+  '1_5': { morning: 'satc', evening: null },
+  '1_6': { morning: 'satc', evening: null },
+  // Augusto (id:2) — Mon off; Tue-Sat evenings; Sun morning+evening
+  '2_1': { morning: null,   evening: 'satc' },
+  '2_2': { morning: null,   evening: 'satc' },
+  '2_3': { morning: null,   evening: 'satc' },
+  '2_4': { morning: null,   evening: 'satc' },
+  '2_5': { morning: null,   evening: 'satc' },
+  '2_6': { morning: 'satc', evening: 'satc' },
+  // Dean (id:5) — Mon Tue Wed evenings; Sat double; Sun morning
+  '5_0': { morning: null,   evening: 'satc' },
+  '5_1': { morning: null,   evening: 'satc' },
+  '5_2': { morning: null,   evening: 'satc' },
+  '5_5': { morning: 'satc', evening: 'satc' },
+  '5_6': { morning: 'satc', evening: null   },
+  // Geronimo (id:8) — Mon double; Tue Wed Thu Fri mornings; weekend off
+  '8_0': { morning: 'satc', evening: 'satc' },
+  '8_1': { morning: 'satc', evening: null   },
+  '8_2': { morning: 'satc', evening: null   },
+  '8_3': { morning: 'satc', evening: null   },
+  '8_4': { morning: 'satc', evening: null   },
+  // Hemanshu (id:9) — Mon double; Tue Wed Thu mornings; Sun evening
+  '9_0': { morning: 'satc', evening: 'satc' },
+  '9_1': { morning: 'satc', evening: null   },
+  '9_2': { morning: 'satc', evening: null   },
+  '9_3': { morning: 'satc', evening: null   },
+  '9_6': { morning: null,   evening: 'satc' },
+  // Kent (id:13) — Tue Wed Thu Fri evenings; Sat morning
+  '13_1': { morning: null,   evening: 'satc' },
+  '13_2': { morning: null,   evening: 'satc' },
+  '13_3': { morning: null,   evening: 'satc' },
+  '13_4': { morning: null,   evening: 'satc' },
+  '13_5': { morning: 'satc', evening: null   },
+  // Kolton (id:15) — Tue Thu Fri Sat Sun evenings; Mon Wed off
+  '15_1': { morning: null, evening: 'satc' },
+  '15_3': { morning: null, evening: 'satc' },
+  '15_4': { morning: null, evening: 'satc' },
+  '15_5': { morning: null, evening: 'satc' },
+  '15_6': { morning: null, evening: 'satc' },
+  // Mateo (id:17) — Mon Tue evenings; Wed double; Fri morning; Sun evening
+  '17_0': { morning: null,   evening: 'satc' },
+  '17_1': { morning: null,   evening: 'satc' },
+  '17_2': { morning: 'satc', evening: 'satc' },
+  '17_4': { morning: 'satc', evening: null   },
+  '17_6': { morning: null,   evening: 'satc' },
+  // Nick (id:19) — Mon through Sat mornings; Sun off
+  '19_0': { morning: 'satc', evening: null },
+  '19_1': { morning: 'satc', evening: null },
+  '19_2': { morning: 'satc', evening: null },
+  '19_3': { morning: 'satc', evening: null },
+  '19_4': { morning: 'satc', evening: null },
+  '19_5': { morning: 'satc', evening: null },
+  // Nolan (id:20) — Mon through Sat evenings; Sun off
+  '20_0': { morning: null, evening: 'satc' },
+  '20_1': { morning: null, evening: 'satc' },
+  '20_2': { morning: null, evening: 'satc' },
+  '20_3': { morning: null, evening: 'satc' },
+  '20_4': { morning: null, evening: 'satc' },
+  '20_5': { morning: null, evening: 'satc' },
+  // Tom (id:25) — Wed through Sun evenings; Mon Tue off
+  '25_2': { morning: null, evening: 'satc' },
+  '25_3': { morning: null, evening: 'satc' },
+  '25_4': { morning: null, evening: 'satc' },
+  '25_5': { morning: null, evening: 'satc' },
+  '25_6': { morning: null, evening: 'satc' },
+};
+
+function sk(cid, day)    { return `${cid}_${day}`; }
+function gs(cid, day)    { return schedule[sk(cid, day)] || { morning: null, evening: null }; }
+function ss(cid, day, v) {
+  if (isReadOnly()) return;
+  const key = sk(cid, day);
+  schedule[key] = v;
+  persistActive();
+}
+
+// ── SCOPE: Current + named Drafts ─────────────────────────────────────────────
+let activeScope = 'current'; // 'current' or numeric draft id
+let currentSched = {};
+let drafts = []; // [{ id, name, schedule, createdAt }]
+
+function isReadOnly() { return activeScope === 'current'; }
+function activeDraft() { return drafts.find(d => d.id === activeScope) || null; }
+
+function persistCurrent() { kv.setItem('coach_template_v1', JSON.stringify(currentSched)); }
+function persistDrafts()  { kv.setItem('coach_drafts_v1',   JSON.stringify(drafts));      }
+function persistScope()   { try { localStorage.setItem('coach_scope_v1', JSON.stringify(activeScope)); } catch(e) {} }
+function persistActive() {
+  if (activeScope === 'current') persistCurrent();
+  else persistDrafts();
+}
+
+function loadSched() {
+  // Current
+  let stored = {};
+  try { stored = JSON.parse(kv.getItem('coach_template_v1')) || {}; } catch(e) {}
+  // If remote already has data, use it as-is (don't overlay INITIAL_SCHEDULE).
+  // Only seed from INITIAL_SCHEDULE if remote is completely empty.
+  currentSched = Object.keys(stored).length ? stored : { ...INITIAL_SCHEDULE };
+  persistCurrent();
+
+  // Drafts
+  try { drafts = JSON.parse(kv.getItem('coach_drafts_v1')) || []; } catch(e) { drafts = []; }
+
+  // Active scope
+  try {
+    const s = JSON.parse(localStorage.getItem('coach_scope_v1'));
+    activeScope = (s === 'current' || drafts.some(d => d.id === s)) ? s : 'current';
+  } catch(e) { activeScope = 'current'; }
+
+  bindActiveSched();
+}
+
+function bindActiveSched() {
+  if (activeScope === 'current') schedule = currentSched;
+  else {
+    const d = activeDraft();
+    schedule = d ? d.schedule : currentSched;
+  }
+}
+
+function switchScope(scope) {
+  if (scope !== 'current' && !drafts.some(d => d.id === scope)) return;
+  activeScope = scope;
+  persistScope();
+  bindActiveSched();
+  // Discard any in-flight edit-mode state
+  editMode = false; pickedShift = null; pendingMoves = [];
+  render();
+}
+
+function newDraft() {
+  const name = (prompt('Name this draft:', `Draft ${drafts.length + 1}`) || '').trim();
+  if (!name) return;
+  const id = Date.now();
+  drafts.push({ id, name, schedule: JSON.parse(JSON.stringify(currentSched)), createdAt: new Date().toISOString() });
+  persistDrafts();
+  switchScope(id);
+}
+
+function renameDraft() {
+  const d = activeDraft(); if (!d) return;
+  const name = (prompt('Rename draft:', d.name) || '').trim();
+  if (!name) return;
+  d.name = name;
+  persistDrafts();
+  renderScopeBar();
+}
+
+function deleteDraft() {
+  const d = activeDraft(); if (!d) return;
+  if (!confirm(`Delete draft "${d.name}"? This cannot be undone.`)) return;
+  drafts = drafts.filter(x => x.id !== d.id);
+  persistDrafts();
+  switchScope('current');
+}
+
+function resetDraftToCurrent() {
+  const d = activeDraft(); if (!d) return;
+  if (!confirm(`Reset "${d.name}" to match Current? Draft edits will be lost.`)) return;
+  d.schedule = JSON.parse(JSON.stringify(currentSched));
+  persistDrafts();
+  bindActiveSched();
+  render();
+}
+
+function promoteDraftToCurrent() {
+  const d = activeDraft(); if (!d) return;
+  if (!confirm(`Promote "${d.name}" to Current? This overwrites the current schedule.`)) return;
+  currentSched = JSON.parse(JSON.stringify(d.schedule));
+  persistCurrent();
+  bindActiveSched();
+  render();
+}
+
+function duplicateDraft() {
+  const d = activeDraft(); if (!d) return;
+  const name = (prompt('Name the copy:', d.name + ' copy') || '').trim();
+  if (!name) return;
+  const id = Date.now();
+  drafts.push({ id, name, schedule: JSON.parse(JSON.stringify(d.schedule)), createdAt: new Date().toISOString() });
+  persistDrafts();
+  switchScope(id);
+}
+
+function renderScopeBar() {
+  const bar = document.getElementById('scope-bar');
+  const inDraft = activeScope !== 'current';
+  bar.classList.toggle('draft', inDraft);
+
+  const opts = `<option value="current" ${activeScope==='current'?'selected':''}>Current Schedule</option>`
+    + drafts.map(d => `<option value="${d.id}" ${d.id===activeScope?'selected':''}>${d.name}</option>`).join('');
+
+  const tag = inDraft
+    ? `<span class="scope-tag draft">Draft — edits saved here only</span>`
+    : `<span class="scope-tag ro">Read-only</span>`;
+
+  const draftBtns = inDraft ? `
+    <button class="scope-btn" onclick="renameDraft()">Rename</button>
+    <button class="scope-btn" onclick="duplicateDraft()">Duplicate</button>
+    <button class="scope-btn" onclick="resetDraftToCurrent()">Reset to Current</button>
+    <button class="scope-btn primary" onclick="promoteDraftToCurrent()">Promote to Current</button>
+    <button class="scope-btn danger" onclick="deleteDraft()">Delete</button>
+  ` : '';
+
+  bar.innerHTML = `
+    <span class="scope-label">Schedule</span>
+    <select class="scope-select" onchange="switchScope(this.value === 'current' ? 'current' : parseInt(this.value))">${opts}</select>
+    ${tag}
+    <div class="scope-btns">
+      <button class="scope-btn" onclick="newDraft()">+ New Draft</button>
+      ${draftBtns}
+    </div>
+  `;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function badge(shift, loc, locked = false) {
+  if (!loc) return '';
+  const cls   = shift === 'morning' ? 'm' : 'e';
+  const label = shift === 'morning' ? 'Morning' : 'Evening';
+  return `<span class="sbadge ${cls} ${loc} ${locked ? 'shift-locked' : ''}"><span class="sloc">${LOCS[loc].name}</span>${label}</span>`;
+}
+function lpip(loc) { return `<span class="lpip ${loc}">${LOCS[loc].name}</span>`; }
+
+// ── LOCK STORE ────────────────────────────────────────────────────────────────
+function saveLocks() {
+  kv.setItem('coach_locks_v1', JSON.stringify({ coaches: [...lockedCoaches], shifts: [...lockedShifts] }));
+}
+function loadLocks() {
+  try {
+    const s = kv.getItem('coach_locks_v1');
+    if (s) { const d = JSON.parse(s); lockedCoaches = new Set(d.coaches); lockedShifts = new Set(d.shifts); }
+  } catch(e) {}
+}
+function isCoachLocked(cid)             { return lockedCoaches.has(cid); }
+function isShiftLocked(cid, day, shift) { return lockedCoaches.has(cid) || lockedShifts.has(`${cid}_${day}_${shift}`); }
+function toggleCoachLock(cid) {
+  if (lockedCoaches.has(cid)) { lockedCoaches.delete(cid); } else { lockedCoaches.add(cid); lockedShifts = new Set([...lockedShifts].filter(k => !k.startsWith(`${cid}_`))); }
+  saveLocks(); render();
+}
+function toggleShiftLock(cid, day, shift) {
+  const key = `${cid}_${day}_${shift}`;
+  if (lockedShifts.has(key)) lockedShifts.delete(key); else lockedShifts.add(key);
+  saveLocks(); render();
+}
+function lockAll()   { COACHES.forEach(c => lockedCoaches.add(c.id));   saveLocks(); render(); }
+function unlockAll() { lockedCoaches.clear(); lockedShifts.clear();       saveLocks(); render(); }
+
+// ── EDIT MODE ─────────────────────────────────────────────────────────────────
+function toggleEditMode() {
+  if (isReadOnly()) { alert('Current schedule is read-only. Switch to a draft (or create one) to edit.'); return; }
+  editMode = !editMode;
+  pickedShift = null;
+  pendingMoves = [];
+  renderOverview();
+}
+
+function discardMoves() {
+  editMode = false; pickedShift = null; pendingMoves = [];
+  renderOverview();
+}
+
+function exportMoves() {
+  if (!pendingMoves.length) return;
+  try { _exportMoves(); } catch(e) { alert('Export error: ' + e.message); }
+}
+function _exportMoves() {
+  const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const coachName = id => COACHES.find(c => c.id === id)?.name || id;
+
+  // Collect affected days
+  const affectedDays = [...new Set(pendingMoves.map(m => m.dayIdx))].sort((a,b)=>a-b);
+
+  // Build preview schedule (same logic as previewSched but for all coaches)
+  function previewAll(dayIdx) {
+    const result = {};
+    COACHES.forEach(c => {
+      const base = gs(c.id, dayIdx);
+      result[c.id] = { morning: base.morning, evening: base.evening };
+    });
+    pendingMoves.filter(m => m.dayIdx === dayIdx).forEach(m => {
+      result[m.fromCoachId][m.shift] = null;
+      result[m.toCoachId][m.shift] = m.loc;
+    });
+    return result;
+  }
+
+  const ts = new Date().toLocaleString();
+
+  let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Schedule Export – ${ts}</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; color: #1e293b; }
+  h1 { font-size: 1.4rem; margin-bottom: .25rem; }
+  .meta { color: #64748b; font-size: .85rem; margin-bottom: 2rem; }
+  h2 { font-size: 1.1rem; border-bottom: 2px solid #e2e8f0; padding-bottom: .4rem; margin-top: 2rem; }
+  table { border-collapse: collapse; width: 100%; margin-top: .75rem; font-size: .9rem; }
+  th { background: #f1f5f9; text-align: left; padding: .5rem .75rem; }
+  td { padding: .45rem .75rem; border-bottom: 1px solid #e2e8f0; }
+  .arrow { color: #94a3b8; }
+  .loc { font-size: .75rem; color: #64748b; text-transform: uppercase; }
+  .day-section { margin-top: 2rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: .75rem; }
+  .shift-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .75rem 1rem; }
+  .shift-card h4 { margin: 0 0 .5rem; font-size: .85rem; color: #475569; text-transform: uppercase; letter-spacing: .05em; }
+  .coach-row { display: flex; justify-content: space-between; padding: .2rem 0; font-size: .9rem; }
+  .changed { background: #fef9c3; border-radius: 3px; padding: 0 3px; }
+  .removed { color: #ef4444; text-decoration: line-through; }
+  .added { color: #16a34a; font-weight: 600; }
+  @media print { body { margin: 1rem; } }
+</style>
+</head><body>
+<h1>Schedule Changes Export</h1>
+<div class="meta">Generated: ${ts} &nbsp;·&nbsp; ${pendingMoves.length} pending move${pendingMoves.length>1?'s':''}</div>
+
+<h2>Moves Summary</h2>
+<table>
+  <thead><tr><th>From</th><th></th><th>To</th><th>Day</th><th>Shift</th><th>Location</th></tr></thead>
+  <tbody>
+${pendingMoves.map(m => `    <tr>
+      <td>${coachName(m.fromCoachId)}</td>
+      <td class="arrow">→</td>
+      <td>${coachName(m.toCoachId)}</td>
+      <td>${DAYS[m.dayIdx]}</td>
+      <td style="text-transform:capitalize">${m.shift}</td>
+      <td class="loc">${m.loc.toUpperCase()}</td>
+    </tr>`).join('\n')}
+  </tbody>
+</table>
+`;
+
+  affectedDays.forEach(dayIdx => {
+    const before = {};
+    COACHES.forEach(c => { before[c.id] = gs(c.id, dayIdx); });
+    const after = previewAll(dayIdx);
+    const changedIds = new Set(pendingMoves.filter(m=>m.dayIdx===dayIdx).flatMap(m=>[m.fromCoachId, m.toCoachId]));
+
+    ['morning','evening'].forEach(shift => {
+      const cap = {};
+      Object.keys(LOCS).forEach(loc => { cap[loc] = getCap(loc, dayIdx, shift); });
+
+      const coachesInShift = COACHES.filter(c => before[c.id][shift] || after[c.id][shift]);
+      if (!coachesInShift.length) return;
+
+      html += `<div class="day-section"><h2>${DAYS[dayIdx]} – ${shift.charAt(0).toUpperCase()+shift.slice(1)}</h2>
+<table>
+  <thead><tr><th>Coach</th><th>Before</th><th></th><th>After</th></tr></thead>
+  <tbody>
+`;
+      coachesInShift.forEach(c => {
+        const bv = before[c.id][shift];
+        const av = after[c.id][shift];
+        const changed = changedIds.has(c.id) && bv !== av;
+        const bCell = bv ? `<span class="${changed?'removed':''}">${bv.toUpperCase()}</span>` : '<span style="color:#cbd5e1">—</span>';
+        const aCell = av ? `<span class="${changed?'added':''}">${av.toUpperCase()}</span>` : '<span style="color:#cbd5e1">—</span>';
+        html += `    <tr${changed?' style="background:#fef9c3"':''}>
+      <td>${c.name}</td>
+      <td>${bCell}</td>
+      <td class="arrow">→</td>
+      <td>${aCell}</td>
+    </tr>\n`;
+      });
+      html += `  </tbody>
+</table></div>\n`;
+    });
+  });
+
+  html += `</body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `schedule-changes-${new Date().toISOString().slice(0,10)}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+function saveMoves() {
+  pendingMoves.forEach(m => {
+    const fromSched = { ...gs(m.fromCoachId, m.dayIdx) };
+    fromSched[m.shift] = null;
+    ss(m.fromCoachId, m.dayIdx, fromSched);
+    const toSched = { ...gs(m.toCoachId, m.dayIdx) };
+    toSched[m.shift] = m.loc;
+    ss(m.toCoachId, m.dayIdx, toSched);
+  });
+  editMode = false; pickedShift = null; pendingMoves = [];
+  renderOverview();
+}
+
+// Returns the schedule for a coach/day with pending moves applied
+function previewSched(coachId, dayIdx) {
+  const s = { ...gs(coachId, dayIdx) };
+  pendingMoves.forEach(m => {
+    if (m.fromCoachId === coachId && m.dayIdx === dayIdx) s[m.shift] = null;
+    if (m.toCoachId   === coachId && m.dayIdx === dayIdx) s[m.shift] = m.loc;
+  });
+  return s;
+}
+
+function pickShift(coachId, dayIdx, shift) {
+  if (isShiftLocked(coachId, dayIdx, shift)) return; // locked shifts can't be moved
+  // Deselect if clicking same badge
+  if (pickedShift && pickedShift.coachId === coachId && pickedShift.dayIdx === dayIdx && pickedShift.shift === shift) {
+    pickedShift = null; renderOverview(); return;
+  }
+  const s = previewSched(coachId, dayIdx);
+  if (!s[shift]) return;
+  pickedShift = { coachId, dayIdx, shift, loc: s[shift] };
+  renderOverview();
+}
+
+function dropOnCell(toCoachId, dayIdx) {
+  if (!pickedShift || pickedShift.dayIdx !== dayIdx || pickedShift.coachId === toCoachId) return;
+  const toCoach  = COACHES.find(c => c.id === toCoachId);
+  // Target coach must work at that location
+  if (!toCoach.locs.includes(pickedShift.loc)) return;
+  // Target must not already have that shift on this day
+  const tSched = previewSched(toCoachId, dayIdx);
+  if (tSched[pickedShift.shift]) return;
+  const fromCoach = COACHES.find(c => c.id === pickedShift.coachId);
+  pendingMoves.push({ fromCoachId: pickedShift.coachId, fromName: fromCoach.name, toCoachId, dayIdx, shift: pickedShift.shift, loc: pickedShift.loc });
+  pickedShift = null;
+  renderOverview();
+}
+
+// Coverage helpers
+function getCoverage(locKey, dayIdx, shift) {
+  const cap      = getCap(locKey, dayIdx, shift);
+  const assigned = COACHES.filter(c => gs(c.id, dayIdx)[shift] === locKey);
+  const locked   = assigned.filter(c => isShiftLocked(c.id, dayIdx, shift));
+  const unlocked = assigned.filter(c => !isShiftLocked(c.id, dayIdx, shift));
+  const gap      = Math.max(0, cap - assigned.length);
+  return { cap, locked, unlocked, gap };
+}
+
+// ── REQUESTS STORE ────────────────────────────────────────────────────────────
+function saveReqs() {
+  kv.setItem('coach_requests_v1', JSON.stringify(requests));
+}
+function loadReqs() {
+  try { const s = kv.getItem('coach_requests_v1'); if (s) requests = JSON.parse(s); } catch(e) {}
+}
+function addRequest(coachId, text, note) {
+  requests.unshift({ id: Date.now(), coachId: parseInt(coachId), text, note, status: 'pending', createdAt: new Date().toISOString() });
+  saveReqs(); updateReqBadge();
+}
+function updateReqStatus(id, status) {
+  const r = requests.find(r => r.id === id);
+  if (r) { r.status = status; saveReqs(); }
+}
+function deleteRequest(id) {
+  requests = requests.filter(r => r.id !== id);
+  saveReqs();
+}
+function updateReqBadge() {
+  const pending = requests.filter(r => r.status === 'pending').length;
+  const tab = document.getElementById('req-tab');
+  if (tab) tab.textContent = pending ? `Requests (${pending})` : 'Requests';
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function render() {
+  renderScopeBar();
+  if      (activeTab === 'overview')  renderOverview();
+  else if (activeTab === 'location')  renderLocation();
+  else if (activeTab === 'coach')     renderCoach();
+  else if (activeTab === 'requests')  renderRequests();
+}
+
+// OVERVIEW
+function renderOverview() {
+  const lockCategory = c => {
+    if (isCoachLocked(c.id)) return 2;
+    if ([...lockedShifts].some(k => k.startsWith(`${c.id}_`))) return 1;
+    return 0;
+  };
+  const coaches = (filterLoc === 'all' ? COACHES : COACHES.filter(c => c.locs.includes(filterLoc)))
+    .slice()
+    .sort((a, b) => lockCategory(a) - lockCategory(b) || a.name.localeCompare(b.name));
+
+  const filterBar = `<div class="filters">
+    <span style="font-size:12px;font-weight:600;color:var(--muted)">Filter:</span>
+    ${fchip('all','All Coaches')}
+    ${fchip('satc','SATC','s')}
+    ${fchip('pharr','Pharr','p')}
+    ${fchip('wilco','Wilco','w')}
+    <button class="fchip ${editMode ? 'active' : ''}" style="${editMode ? 'background:#f59e0b;border-color:#f59e0b;color:#1e293b' : ''}"
+      onclick="toggleEditMode()">${editMode ? '✕ Exit Edit Mode' : '⇄ Edit Shifts'}</button>
+  </div>`;
+
+  const thead = `<thead><tr>
+    <th>Coach</th>
+    ${DAYS.map(d => `<th>${d}</th>`).join('')}
+  </tr></thead>`;
+
+  const tbody = `<tbody>${coaches.map(c => {
+    const locked = isCoachLocked(c.id);
+    return `<tr class="${locked ? 'coach-locked' : ''}">
+    <td class="coach-col">
+      <div class="coach-col-inner">
+        ${!editMode ? `<button class="lock-btn ${locked ? 'locked' : ''}" title="${locked ? 'Unlock coach' : 'Lock coach'}"
+          onclick="event.stopPropagation();toggleCoachLock(${c.id})">${locked ? '🔒' : '🔓'}</button>` : ''}
+        <div>
+          <div class="cc-name">${c.name}</div>
+          <div class="cc-locs">${c.locs.length ? c.locs.map(lpip).join('') : '<span class="lpip" style="background:#f1f5f9;color:#94a3b8">N/A</span>'}</div>
+        </div>
+      </div>
+    </td>
+    ${DAYS.map((_, i) => {
+      if (editMode) {
+        // Edit mode cell
+        const s      = previewSched(c.id, i);
+        const isPicked = pickedShift && pickedShift.coachId === c.id && pickedShift.dayIdx === i;
+        const movedM = pendingMoves.find(m => m.toCoachId === c.id && m.dayIdx === i && m.shift === 'morning');
+        const movedE = pendingMoves.find(m => m.toCoachId === c.id && m.dayIdx === i && m.shift === 'evening');
+
+        // Drop target logic
+        let dropCls = '';
+        if (pickedShift && pickedShift.dayIdx === i && pickedShift.coachId !== c.id) {
+          const canDrop = c.locs.includes(pickedShift.loc) && !s[pickedShift.shift];
+          dropCls = canDrop ? 'drop-target' : 'drop-invalid';
+        }
+
+        const mLocked = isShiftLocked(c.id, i, 'morning');
+        const eLocked = isShiftLocked(c.id, i, 'evening');
+        const mBadge = s.morning ? `<div>
+          <span class="sbadge m ${s.morning} ${mLocked ? 'shift-locked' : 'in-edit-mode'} ${isPicked && pickedShift.shift==='morning' ? 'picked' : ''} ${movedM?'moved':''}"
+            style="${mLocked ? 'cursor:not-allowed;opacity:.6' : ''}"
+            onclick="event.stopPropagation();pickShift(${c.id},${i},'morning')">
+            <span class="sloc">${LOCS[s.morning].name}</span>Morning${mLocked ? ' 🔒' : ''}
+          </span>
+          ${movedM ? `<div class="from-tag">\u2190 from ${movedM.fromName}</div>` : ''}
+        </div>` : '';
+        const eBadge = s.evening ? `<div>
+          <span class="sbadge e ${s.evening} ${eLocked ? 'shift-locked' : 'in-edit-mode'} ${isPicked && pickedShift.shift==='evening' ? 'picked' : ''} ${movedE?'moved':''}"
+            style="${eLocked ? 'cursor:not-allowed;opacity:.6' : ''}"
+            onclick="event.stopPropagation();pickShift(${c.id},${i},'evening')">
+            <span class="sloc">${LOCS[s.evening].name}</span>Evening${eLocked ? ' 🔒' : ''}
+          </span>
+          ${movedE ? `<div class="from-tag">\u2190 from ${movedE.fromName}</div>` : ''}
+        </div>` : '';
+
+        return `<td class="day-col ${dropCls}" onclick="dropOnCell(${c.id},${i})">
+          <div class="cell-inner">
+            ${mBadge}${eBadge}
+            ${!s.morning && !s.evening ? '<span class="cell-empty">\u2014</span>' : ''}
+          </div>
+        </td>`;
+      } else {
+        // Normal mode cell
+        const s = gs(c.id, i);
+        const mLocked = isShiftLocked(c.id, i, 'morning');
+        const eLocked = isShiftLocked(c.id, i, 'evening');
+        const editable = !locked && !isReadOnly();
+        return `<td class="day-col" onclick="${editable ? `openModal(${c.id}, ${i})` : ''}" style="${editable?'':'cursor:default'}">
+          <div class="cell-inner">
+            ${s.morning ? `<div class="shift-lock-wrap">${badge('morning', s.morning, mLocked)}${!locked ? `<span class="shift-lock-icon ${mLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'morning')">${mLocked?'🔒':'🔒'}</span>` : ''}</div>` : ''}
+            ${s.evening ? `<div class="shift-lock-wrap">${badge('evening', s.evening, eLocked)}${!locked ? `<span class="shift-lock-icon ${eLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'evening')">${eLocked?'🔒':'🔒'}</span>` : ''}</div>` : ''}
+            ${!s.morning && !s.evening ? `<span class="cell-empty">\u2014</span>` : ''}
+          </div>
+          ${editable ? '<div class="cell-add">+ add</div>' : ''}
+        </td>`;
+      }
+    }).join('')}
+  </tr>`;
+  }).join('')}</tbody>`;
+
+  const editBar = editMode ? `<div class="edit-bar">
+    <div class="edit-bar-info">
+      ${pickedShift ? `<span style="color:#fbbf24">Shift picked — click a coach cell to place it</span>` : `Edit mode — click a shift to pick it up`}
+      ${pendingMoves.length ? `<span>${pendingMoves.length} move${pendingMoves.length>1?'s':''} pending</span>` : ''}
+    </div>
+    <div class="edit-bar-btns">
+      <button class="btn btn-ghost" style="color:white;border-color:#475569" onclick="discardMoves()">Discard</button>
+      <button class="btn btn-ghost" style="color:white;border-color:#475569" ${!pendingMoves.length?'disabled style="opacity:.4"':''} onclick="exportMoves()">Export</button>
+      <button class="btn btn-primary" ${!pendingMoves.length?'disabled style="opacity:.4"':''} onclick="saveMoves()">Save Changes</button>
+    </div>
+  </div>` : '';
+
+  document.getElementById('pane-overview').innerHTML =
+    filterBar + `<div class="tbl-wrap ${editMode?'in-edit':''}"><table>${thead}${tbody}</table></div>` + editBar;
+}
+
+function fchip(loc, label, cls = '') {
+  return `<button class="fchip ${cls} ${filterLoc === loc ? 'active' : ''}"
+    onclick="setFilter('${loc}')">${label}</button>`;
+}
+function setFilter(loc) { filterLoc = loc; renderOverview(); }
+
+// BY LOCATION
+function renderLocation() {
+  const dayTabs = `<div class="day-selector">
+    ${DAYS.map((d, i) => `<button class="day-tab ${locDayIdx === i ? 'active' : ''}"
+      onclick="setLocDay(${i})">${d}</button>`).join('')}
+  </div>`;
+
+  const cards = Object.entries(LOCS).map(([locKey, locData]) => {
+    const shifts = ['morning', 'evening'].map(shift => {
+      const coaches = COACHES.filter(c => gs(c.id, locDayIdx)[shift] === locKey);
+      const cnt = coaches.length, cap = getCap(locKey, locDayIdx, shift);
+      const pct = cap > 0 ? Math.min(cnt / cap, 1) * 100 : 0;
+      const over = cap > 0 && cnt > cap;
+      const s = shift === 'morning' ? 'm' : 'e';
+      return `<div class="lc-shift">
+        <div class="lc-shift-head">
+          <div class="lc-shift-label ${s}">${shift === 'morning' ? 'Morning' : 'Evening'}</div>
+          <div class="lc-shift-time">${shift === 'morning' ? '7am \u2013 2pm' : '3pm \u2013 10pm'}</div>
+        </div>
+        <div class="cap-bar">
+          <div class="cap-fill ${over ? 'over' : locKey}" style="width:${pct}%"></div>
+        </div>
+        <div class="cap-label ${over ? 'over' : ''}">
+          ${cnt} / ${cap} courts${over ? ' \u2014 OVER CAPACITY' : ''}
+        </div>
+        <div class="lc-names">
+          ${coaches.length
+            ? coaches.map(c => `<div class="lc-name">${c.name}</div>`).join('')
+            : '<div class="lc-empty">No coaches assigned</div>'}
+        </div>
+      </div>`;
+    }).join('');
+    const mCap = getCap(locKey, locDayIdx, 'morning');
+    const eCap = getCap(locKey, locDayIdx, 'evening');
+    const courtLabel = mCap === eCap ? `${mCap} courts` : `${mCap} morning · ${eCap} evening`;
+    return `<div class="loc-card">
+      <div class="lc-head ${locKey}">
+        <div class="lc-title">${locData.name}</div>
+        <div class="lc-courts">${courtLabel}</div>
+      </div>
+      <div class="lc-body">${shifts}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('pane-location').innerHTML =
+    dayTabs + `<div class="loc-grid">${cards}</div>`;
+}
+function setLocDay(i) { locDayIdx = i; renderLocation(); }
+
+// COACH VIEW
+function renderCoach() {
+  const coach = COACHES.find(c => c.id === selectedCoachId);
+  const init  = coach.name.split(' ').map(w => w[0]).join('');
+  const color = LOC_COLORS[coach.locs[0]] || '#94a3b8';
+
+  const picker = `<div class="coach-picker-wrap">
+    <select onchange="selCoach(parseInt(this.value))">
+      ${COACHES.map(c =>
+        `<option value="${c.id}" ${c.id === selectedCoachId ? 'selected' : ''}>${c.name}</option>`
+      ).join('')}
+    </select>
+  </div>`;
+
+  const banner = `<div class="coach-banner">
+    <div class="coach-avatar" style="background:${color}">${init}</div>
+    <div>
+      <div class="coach-banner-name">${coach.name}</div>
+      <div class="coach-banner-locs">
+        ${coach.locs.map(lpip).join('')}
+        ${coach.locs.length > 1 ? '<span class="hybrid-tag">\u00b7 Hybrid coach</span>' : ''}
+      </div>
+    </div>
+  </div>`;
+
+  const rows = DAYS.map((day, i) => {
+    const s = gs(coach.id, i);
+    return `<div class="week-row">
+      <div class="wr-day-name">${day}</div>
+      <div class="wr-shift">
+        ${s.morning ? badge('morning', s.morning) : '<span class="no-shift-lbl">No morning shift</span>'}
+      </div>
+      <div class="wr-shift">
+        ${s.evening ? badge('evening', s.evening) : '<span class="no-shift-lbl">No evening shift</span>'}
+      </div>
+      <button class="wr-edit-btn" onclick="openModal(${coach.id}, ${i})">Edit</button>
+    </div>`;
+  }).join('');
+
+  document.getElementById('pane-coach').innerHTML =
+    picker + banner + `<div class="week-grid">${rows}</div>`;
+}
+function selCoach(id) { selectedCoachId = id; renderCoach(); }
+
+// REQUESTS
+let rms = {}; // request modal state
+
+function reqSummary(r) {
+  const coach  = COACHES.find(c => c.id === r.coachId);
+  const days   = r.days.map(i => DAYS[i].slice(0,3)).join(', ');
+  const from   = r.shift === 'morning' ? 'Morning' : 'Evening';
+  const action = r.action === 'to_morning' ? '→ Morning' : r.action === 'to_evening' ? '→ Evening' : '→ Remove';
+  return `${coach?.name}: ${from} ${action} — ${days}`;
+}
+
+function renderRequests() {
+  const types   = ['all','request','flexible'];
+  const tLabel  = { all:'All', request:'Coach Requests', flexible:'Flexible Options' };
+  const pending = requests.filter(r => r.status === 'pending').length;
+
+  const filtered = reqFilter === 'all' ? requests : requests.filter(r => r.type === reqFilter);
+  const open     = filtered.filter(r => r.status === 'pending');
+  const resolved = filtered.filter(r => r.status !== 'pending');
+
+  const toolbar = `<div class="req-toolbar">
+    <div class="req-filters">
+      ${types.map(t => `<button class="fchip ${reqFilter===t?'active':''}" onclick="setReqFilter('${t}')">${tLabel[t]}</button>`).join('')}
+    </div>
+    <button class="btn btn-primary" onclick="openReqModal()">+ Add Item</button>
+  </div>`;
+
+  function cardHTML(r) {
+    const coach   = COACHES.find(c => c.id === r.coachId);
+    const days    = r.days.map(i => DAYS[i].slice(0,3)).join(', ');
+    const from    = r.shift === 'morning' ? 'Morning' : 'Evening';
+    const toLabel = r.action === 'to_morning' ? 'Convert to Morning' : r.action === 'to_evening' ? 'Convert to Evening' : 'Remove shift';
+    const typeBadge = r.type === 'request'
+      ? `<span class="req-badge" style="background:#ede9fe;color:#4c1d95">Request</span>`
+      : `<span class="req-badge" style="background:#e0f2fe;color:#075985">Flexible</span>`;
+    const canApply = r.status === 'pending' || r.status === 'approved';
+    return `<div class="req-card status-${r.status}">
+      <div style="flex:1">
+        <div class="req-coach">
+          ${coach?.name || 'Unknown'} ${coach?.locs.map(lpip).join('') || ''}
+          ${typeBadge}
+          <span class="req-badge ${r.status}">${r.status}</span>
+        </div>
+        <div class="req-text" style="margin:6px 0 4px">
+          <strong>${from}</strong> &rarr; <strong>${toLabel}</strong>
+        </div>
+        <div style="font-size:12px;color:${r.days.length?'var(--muted)':'#dc2626'}">Days: ${r.days.length ? days : 'TBD — edit to specify'}</div>
+        ${r.loc ? `<div style="font-size:12px;color:var(--muted)">Location: ${LOCS[r.loc]?.name || r.loc}</div>` : ''}
+        ${r.note ? `<div class="req-note" style="margin-top:4px">Note: ${r.note}</div>` : ''}
+      </div>
+      <div class="req-actions" style="flex-direction:column;align-items:flex-end">
+        ${canApply && r.days.length ? `<button class="req-btn approve" onclick="previewReq(${r.id})">Preview</button>` : ''}
+        ${canApply && r.days.length ? `<button class="req-btn done-btn" onclick="applyReq(${r.id})">Apply</button>` : ''}
+        ${r.status === 'pending' ? `<button class="req-btn" onclick="editReq(${r.id})">Edit</button>` : ''}
+        ${r.status === 'pending' && r.type === 'request' ? `<button class="req-btn deny" onclick="reqSetStatus(${r.id},'denied')">Deny</button>` : ''}
+        ${r.status !== 'pending' ? `<button class="req-btn" onclick="reqSetStatus(${r.id},'pending')">Reopen</button>` : ''}
+        <button class="req-btn" onclick="reqDelete(${r.id})" style="color:#dc2626">Delete</button>
+      </div>
+    </div>`;
+  }
+
+  const openHTML    = open.length    ? open.map(cardHTML).join('')    : `<div class="req-empty">No open items.</div>`;
+  const resolvedHTML= resolved.length? resolved.map(cardHTML).join(''): '';
+
+  document.getElementById('pane-requests').innerHTML = toolbar
+    + `<div class="req-list">${openHTML}</div>`
+    + (resolvedHTML ? `<div style="margin-top:20px;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Resolved</div><div class="req-list">${resolvedHTML}</div>` : '');
+}
+
+function setReqFilter(f) { reqFilter = f; renderRequests(); }
+function reqSetStatus(id, s) { updateReqStatus(id, s); updateReqBadge(); renderRequests(); }
+function reqDelete(id) { if (confirm('Delete this item?')) { deleteRequest(id); updateReqBadge(); renderRequests(); } }
+
+// ── REQUEST MODAL ─────────────────────────────────────────────────────────────
+function openReqModal() {
+  const firstCoach = COACHES.find(c => c.locs.length);
+  rms = { type:'request', coachId: firstCoach.id, shift:'morning', action:'to_evening', days:[], loc: firstCoach.locs[0], note:'' };
+  renderReqModal();
+}
+
+function renderReqModal() {
+  const coach     = COACHES.find(c => c.id === rms.coachId);
+  const availDays = DAYS.map((_, i) => gs(rms.coachId, i)[rms.shift] ? i : null).filter(i => i !== null);
+  const showLoc   = coach.locs.length > 1 && rms.action !== 'remove';
+
+  // Available actions depend on which shift we're changing
+  const actionOpts = rms.shift === 'morning'
+    ? [{ v:'to_evening', l:'Convert to Evening' }, { v:'remove', l:'Remove shift' }]
+    : [{ v:'to_morning', l:'Convert to Morning' }, { v:'remove', l:'Remove shift' }];
+
+  document.getElementById('modal-root').innerHTML = `
+    <div class="overlay" onclick="bgClose(event)">
+      <div class="modal" style="width:460px">
+        <div class="mhead">
+          <div class="mhead-title">Add Change Item</div>
+        </div>
+        <div class="mbody" style="display:flex;flex-direction:column;gap:16px">
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Type</label>
+            <div style="display:flex;gap:8px">
+              <button class="loc-opt satc ${rms.type==='request'?'sel':''}" onclick="rmsSet('type','request')">Coach Request</button>
+              <button class="loc-opt pharr ${rms.type==='flexible'?'sel':''}" onclick="rmsSet('type','flexible')">Flexible Option</button>
+            </div>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Coach</label>
+            <select class="form-select" onchange="rmsSet('coachId',parseInt(this.value))">
+              ${COACHES.filter(c=>c.locs.length).map(c=>`<option value="${c.id}" ${c.id===rms.coachId?'selected':''}>${c.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Shift to change</label>
+            <div style="display:flex;gap:8px">
+              <button class="loc-opt wilco ${rms.shift==='morning'?'sel':''}" onclick="rmsSet('shift','morning')">Morning</button>
+              <button class="loc-opt wilco ${rms.shift==='evening'?'sel':''}" onclick="rmsSet('shift','evening')">Evening</button>
+            </div>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Action</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${actionOpts.map(a=>`<button class="loc-opt satc ${rms.action===a.v?'sel':''}" onclick="rmsSet('action','${a.v}')">${a.l}</button>`).join('')}
+            </div>
+          </div>
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Days <span style="font-weight:400;color:var(--muted)">(coach must have that shift on selected days)</span></label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${DAYS.map((d,i)=>{
+                const has = availDays.includes(i);
+                const sel = rms.days.includes(i);
+                return `<button class="day-tab ${sel?'active':''}" ${!has?'disabled style="opacity:.3;cursor:not-allowed"':''} onclick="rmsToggleDay(${i})">${d.slice(0,3)}</button>`;
+              }).join('')}
+            </div>
+            ${availDays.length===0?`<div style="font-size:12px;color:#dc2626;margin-top:6px">No ${rms.shift} shifts found for this coach.</div>`:''}
+          </div>
+          ${showLoc?`<div class="form-row" style="margin:0">
+            <label class="form-label">New location</label>
+            <div class="loc-opts">${coach.locs.map(lk=>`<button class="loc-opt ${lk} ${rms.loc===lk?'sel':''}" onclick="rmsSet('loc','${lk}')">${LOCS[lk].name}</button>`).join('')}</div>
+          </div>`:''}
+          <div class="form-row" style="margin:0">
+            <label class="form-label">Notes <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+            <input class="form-input" value="${rms.note}" oninput="rms.note=this.value" placeholder="Any context...">
+          </div>
+        </div>
+        <div class="mfoot">
+          <div></div>
+          <div class="mfoot-right">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="submitReq()">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function rmsSet(key, val) {
+  rms[key] = val;
+  if (key === 'coachId') { rms.days = []; const c = COACHES.find(c=>c.id===val); rms.loc = c?.locs[0]||null; }
+  if (key === 'shift')   { rms.days = []; rms.action = val==='morning'?'to_evening':'to_morning'; }
+  renderReqModal();
+}
+function rmsToggleDay(i) {
+  rms.days = rms.days.includes(i) ? rms.days.filter(d=>d!==i) : [...rms.days,i].sort((a,b)=>a-b);
+  renderReqModal();
+}
+
+function submitReq() {
+  const coach = COACHES.find(c=>c.id===rms.coachId);
+  const loc   = coach.locs.length===1 ? coach.locs[0] : (rms.loc||coach.locs[0]);
+  if (rms.editId) {
+    // Edit existing
+    const r = requests.find(r=>r.id===rms.editId);
+    Object.assign(r, { type:rms.type, coachId:rms.coachId, shift:rms.shift, action:rms.action, days:[...rms.days], loc, note:rms.note });
+  } else {
+    requests.unshift({ id:Date.now(), type:rms.type, coachId:rms.coachId, shift:rms.shift, action:rms.action, days:[...rms.days], loc, note:rms.note, status:'pending', createdAt:new Date().toISOString() });
+  }
+  saveReqs(); updateReqBadge(); closeModal(); renderRequests();
+}
+
+function editReq(id) {
+  const r = requests.find(r=>r.id===id);
+  rms = { type:r.type, coachId:r.coachId, shift:r.shift, action:r.action, days:[...r.days], loc:r.loc, note:r.note, editId:id };
+  renderReqModal();
+}
+
+// ── PREVIEW & APPLY ───────────────────────────────────────────────────────────
+function previewReq(id) {
+  const r     = requests.find(r=>r.id===id);
+  const coach = COACHES.find(c=>c.id===r.coachId);
+
+  const rows = r.days.map(dayIdx => {
+    const cur      = gs(r.coachId, dayIdx);
+    const fromLoc  = cur[r.shift];
+    const toLoc    = r.action === 'remove' ? null : r.loc;
+
+    // Shifts affected per location
+    const impacts = [];
+
+    if (fromLoc) {
+      const capBefore = getCap(fromLoc, dayIdx, r.shift);
+      const cntBefore = COACHES.filter(c=>gs(c.id,dayIdx)[r.shift]===fromLoc).length;
+      const cntAfter  = cntBefore - 1;
+      impacts.push({ loc:fromLoc, shift:r.shift, before:cntBefore, after:cntAfter, cap:capBefore });
+    }
+    if (toLoc && r.action !== 'remove') {
+      const newShift  = r.action === 'to_morning' ? 'morning' : 'evening';
+      const capAfter  = getCap(toLoc, dayIdx, newShift);
+      const cntBefore = COACHES.filter(c=>gs(c.id,dayIdx)[newShift]===toLoc).length;
+      const cntAfter  = cntBefore + 1;
+      impacts.push({ loc:toLoc, shift:newShift, before:cntBefore, after:cntAfter, cap:capAfter });
+    }
+
+    const impactHTML = impacts.map(im => {
+      const diff     = im.after - im.before;
+      const gapAfter = im.after < im.cap;
+      const overAfter= im.after > im.cap;
+      const arrow    = diff > 0 ? `<span style="color:#16a34a">+1</span>` : `<span style="color:#dc2626">-1</span>`;
+      const warn     = gapAfter ? ` <span style="color:#dc2626;font-size:10px">⚠ gap</span>` : overAfter ? ` <span style="color:#dc2626;font-size:10px">⚠ over</span>` : ` <span style="color:#16a34a;font-size:10px">✓</span>`;
+      const sLabel   = im.shift === 'morning' ? 'AM' : 'PM';
+      return `<div style="font-size:12px;margin-top:3px">${LOCS[im.loc].name} ${sLabel}: ${im.before}→${im.after}/${im.cap} ${arrow}${warn}</div>`;
+    }).join('');
+
+    return `<div style="padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:13px;font-weight:700">${DAYS[dayIdx]}</div>
+      ${impactHTML || '<div style="font-size:12px;color:var(--muted)">No scheduled shift on this day.</div>'}
+    </div>`;
+  }).join('');
+
+  document.getElementById('modal-root').innerHTML = `
+    <div class="overlay" onclick="bgClose(event)">
+      <div class="modal">
+        <div class="mhead">
+          <div class="mhead-title">Preview: ${coach.name}</div>
+          <div class="mhead-sub">${reqSummary(r)}</div>
+        </div>
+        <div class="mbody">${rows}</div>
+        <div class="mfoot">
+          <div></div>
+          <div class="mfoot-right">
+            <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+            <button class="btn btn-primary" onclick="closeModal();applyReq(${id})">Apply Change</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function applyReq(id) {
+  if (isReadOnly()) { alert('Cannot apply to the current (read-only) schedule. Switch to a draft.'); return; }
+  const r = requests.find(r=>r.id===id);
+  r.days.forEach(dayIdx => {
+    const cur     = { ...gs(r.coachId, dayIdx) };
+    const newShift = r.action==='to_morning' ? 'morning' : r.action==='to_evening' ? 'evening' : null;
+    if (r.action === 'remove') {
+      cur[r.shift] = null;
+    } else {
+      cur[r.shift] = null;       // remove old
+      cur[newShift] = r.loc;     // add new
+    }
+    ss(r.coachId, dayIdx, cur);
+  });
+  r.status = 'done';
+  saveReqs(); updateReqBadge(); render();
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function openModal(coachId, dayIdx) {
+  if (isReadOnly()) { alert('Current schedule is read-only. Switch to a draft to edit.'); return; }
+  const coach = COACHES.find(c => c.id === coachId);
+  if (!coach.locs.length) return; // N/A coaches can't be scheduled
+  const { morning, evening } = gs(coachId, dayIdx);
+  ms = {
+    coachId, dayIdx,
+    m_on:  !!morning,  m_loc: morning || coach.locs[0],
+    e_on:  !!evening,  e_loc: evening || coach.locs[0],
+  };
+  renderModal();
+}
+
+function renderModal() {
+  const coach  = COACHES.find(c => c.id === ms.coachId);
+  const hasAny = ms.m_on || ms.e_on;
+
+  document.getElementById('modal-root').innerHTML = `
+    <div class="overlay" onclick="bgClose(event)">
+      <div class="modal">
+        <div class="mhead">
+          <div class="mhead-title">${coach.name}</div>
+          <div class="mhead-sub">${DAYS[ms.dayIdx]}</div>
+        </div>
+        <div class="mbody">
+          ${sblock('morning','Morning','7:00 am \u2013 2:00 pm', ms.m_on, ms.m_loc, coach.locs)}
+          ${sblock('evening','Evening','3:00 pm \u2013 10:00 pm', ms.e_on, ms.e_loc, coach.locs)}
+        </div>
+        <div class="mfoot">
+          <div>${hasAny ? `<button class="btn btn-red" onclick="clearDay()">Clear</button>` : ''}</div>
+          <div class="mfoot-right">
+            <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveModal()">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function sblock(shift, label, time, isOn, selLoc, coachLocs) {
+  const s      = shift === 'morning' ? 'm' : 'e';
+  const onKey  = shift === 'morning' ? 'm_on'  : 'e_on';
+  const locKey = shift === 'morning' ? 'm_loc' : 'e_loc';
+  return `<div class="sblock">
+    <div class="sblock-head ${s}" onclick="toggle('${onKey}')">
+      <div>
+        <div class="sblock-title ${s}">${label}</div>
+        <div class="sblock-time">${time}</div>
+      </div>
+      <button class="toggle ${isOn ? 'on' : ''}"
+        onclick="event.stopPropagation();toggle('${onKey}')"></button>
+    </div>
+    ${isOn ? `<div class="loc-opts">
+      ${Object.entries(LOCS).map(([lk, ld]) => {
+        const avail = coachLocs.includes(lk);
+        return `<button class="loc-opt ${lk} ${selLoc === lk ? 'sel' : ''}"
+          ${!avail ? 'disabled' : ''}
+          onclick="setLoc('${locKey}','${lk}')">${ld.name}</button>`;
+      }).join('')}
+    </div>` : ''}
+  </div>`;
+}
+
+function toggle(key)      { ms[key] = !ms[key]; renderModal(); }
+function setLoc(key, loc) { ms[key] = loc; renderModal(); }
+
+function saveModal() {
+  ss(ms.coachId, ms.dayIdx, {
+    morning: ms.m_on ? ms.m_loc : null,
+    evening: ms.e_on ? ms.e_loc : null,
+  });
+  closeModal();
+  render();
+}
+function clearDay() {
+  ss(ms.coachId, ms.dayIdx, { morning: null, evening: null });
+  closeModal();
+  render();
+}
+function closeModal() { document.getElementById('modal-root').innerHTML = ''; ms = null; }
+function bgClose(e)   { if (e.target.classList.contains('overlay')) closeModal(); }
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function setTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  ['overview', 'location', 'coach', 'requests'].forEach(t => {
+    document.getElementById(`pane-${t}`).classList.toggle('hidden', t !== tab);
+  });
+  render();
+}
+
+// ── IMPORT FROM LOCALSTORAGE (one-time migration) ─────────────────────────────
+async function importLocalStorage() {
+  const map = {
+    coach_template_v1: 'current_schedule',
+    coach_drafts_v1:   'drafts',
+    coach_locks_v1:    'locks',
+    coach_requests_v1: 'requests',
+  };
+  let pushed = 0;
+  for (const [localKey, remoteKey] of Object.entries(map)) {
+    const v = localStorage.getItem(localKey);
+    if (v == null) continue;
+    try { JSON.parse(v); } catch { continue; }
+    const r = await fetch('/api/state/' + remoteKey, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: v,
+    });
+    if (r.ok) pushed++;
+  }
+  alert(`Imported ${pushed} keys to the cloud database. Reloading…`);
+  location.reload();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+(async function init() {
+  const root = document.getElementById('main');
+  root.innerHTML = '<div style="padding:48px;text-align:center;color:#64748b">Loading…</div>';
+  try {
+    await kv.bootstrap();
+  } catch (e) {
+    root.innerHTML = `<div style="padding:48px;text-align:center;color:#dc2626">
+      Failed to load from server: ${e.message}<br>
+      <button class="scope-btn" style="margin-top:12px" onclick="location.reload()">Retry</button>
+    </div>`;
+    return;
+  }
+
+  // Restore the loading panes
+  root.innerHTML = `
+    <div id="pane-overview"></div>
+    <div id="pane-location" class="hidden"></div>
+    <div id="pane-coach"     class="hidden"></div>
+    <div id="pane-requests"  class="hidden"></div>
+  `;
+
+  // Show import banner if cloud is empty but localStorage has data
+  if (kv.isRemoteEmpty() && localStorage.getItem('coach_template_v1')) {
+    document.getElementById('import-banner').classList.remove('hidden');
+  }
+
+  loadSched();
+  loadLocks();
+  loadReqs();
+  updateReqBadge();
+  updateSyncIndicator();
+  render();
+
+  // Best-effort flush before the tab closes
+  window.addEventListener('beforeunload', () => { kv.flushAll(); });
+})();
+</script>
+</body>
+</html>
