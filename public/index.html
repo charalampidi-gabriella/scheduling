@@ -756,7 +756,7 @@ const INITIAL_SCHEDULE = {
   '15_6': { morning: null, evening: 'satc' },
   // Mateo (id:17) — Mon evening; Wed double; Thu morning; Fri morning; Sat evening; Sun evening
   '17_0': { morning: null,   evening: 'satc' },
-  '17_2': { morning: 'satc', evening: 'satc' },
+  '17_2': { morning: null,   evening: 'satc' },
   '17_3': { morning: 'satc', evening: 'satc' },
   '17_4': { morning: 'satc', evening: null   },
   '17_5': { morning: null,   evening: 'satc' },
@@ -775,7 +775,8 @@ const INITIAL_SCHEDULE = {
   '20_3': { morning: null, evening: 'satc' },
   '20_4': { morning: null, evening: 'satc' },
   '20_5': { morning: null, evening: 'satc' },
-  // Tom (id:25) — Thu double SATC; Fri/Sat/Sun mornings SATC; Sat keeps PM; Mon-Wed off (mornings only otherwise)
+  // Tom (id:25) — Wed/Thu/Fri/Sat/Sun mornings SATC; Mon Tue off
+  '25_2': { morning: 'satc', evening: null   },
   '25_3': { morning: 'satc', evening: null   },
   '25_4': { morning: 'satc', evening: null   },
   '25_5': { morning: 'satc', evening: null   },
