@@ -1216,9 +1216,11 @@ function saveMoves() {
   pendingMoves.forEach(m => {
     const fromSched = { ...gs(m.fromCoachId, m.dayIdx) };
     fromSched[m.shift] = null;
+    delete fromSched[m.shift + 'From']; // clear any inherited provenance on the source side
     ss(m.fromCoachId, m.dayIdx, fromSched);
     const toSched = { ...gs(m.toCoachId, m.dayIdx) };
     toSched[m.shift] = m.loc;
+    toSched[m.shift + 'From'] = m.fromName; // persist provenance so it survives save
     ss(m.toCoachId, m.dayIdx, toSched);
   });
   editMode = false; pickedShift = null; pendingMoves = [];
@@ -1393,8 +1395,8 @@ function renderOverview() {
         const editable = !locked && !isReadOnly();
         return `<td class="day-col" onclick="${editable ? `openModal(${c.id}, ${i})` : ''}" style="${editable?'':'cursor:default'}">
           <div class="cell-inner">
-            ${s.morning ? `<div class="shift-lock-wrap">${badge('morning', s.morning, mLocked)}${!locked ? `<span class="shift-lock-icon ${mLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'morning')">${mLocked?'🔒':'🔒'}</span>` : ''}</div>` : ''}
-            ${s.evening ? `<div class="shift-lock-wrap">${badge('evening', s.evening, eLocked)}${!locked ? `<span class="shift-lock-icon ${eLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'evening')">${eLocked?'🔒':'🔒'}</span>` : ''}</div>` : ''}
+            ${s.morning ? `<div><div class="shift-lock-wrap">${badge('morning', s.morning, mLocked)}${!locked ? `<span class="shift-lock-icon ${mLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'morning')">${mLocked?'🔒':'🔒'}</span>` : ''}</div>${s.morningFrom?`<div class="from-tag">← from ${s.morningFrom}</div>`:''}</div>` : ''}
+            ${s.evening ? `<div><div class="shift-lock-wrap">${badge('evening', s.evening, eLocked)}${!locked ? `<span class="shift-lock-icon ${eLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'evening')">${eLocked?'🔒':'🔒'}</span>` : ''}</div>${s.eveningFrom?`<div class="from-tag">← from ${s.eveningFrom}</div>`:''}</div>` : ''}
             ${!s.morning && !s.evening ? `<span class="cell-empty">\u2014</span>` : ''}
           </div>
           ${editable ? '<div class="cell-add">+ add</div>' : ''}
@@ -1506,9 +1508,11 @@ function renderCoach() {
       <div class="wr-day-name">${day}</div>
       <div class="wr-shift">
         ${s.morning ? badge('morning', s.morning) : '<span class="no-shift-lbl">No morning shift</span>'}
+        ${s.morningFrom ? `<div class="from-tag">← from ${s.morningFrom}</div>` : ''}
       </div>
       <div class="wr-shift">
         ${s.evening ? badge('evening', s.evening) : '<span class="no-shift-lbl">No evening shift</span>'}
+        ${s.eveningFrom ? `<div class="from-tag">← from ${s.eveningFrom}</div>` : ''}
       </div>
       <button class="wr-edit-btn" onclick="openModal(${coach.id}, ${i})">Edit</button>
     </div>`;
