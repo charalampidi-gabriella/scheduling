@@ -72,6 +72,7 @@
 #pane-master .ms-block .ms-sembadge { font-size:9px; line-height:1; background:rgba(0,0,0,0.3); padding:2px 5px; border-radius:3px; font-weight:700; letter-spacing:0.5px; }
 #pane-master .ms-block .ms-dupbadge { font-size:11px; line-height:1; cursor:help; background:#dc2626; color:#fff; border-radius:3px; padding:1px 4px; }
 #pane-master .ms-block.ms-dup { box-shadow:0 0 0 2px #dc2626, 0 1px 2px rgba(0,0,0,0.15); }
+#pane-master .ms-block.ms-dup.peer-hover { box-shadow:0 0 0 3px #fbbf24, 0 0 14px rgba(251,191,36,0.7); z-index:11; }
 #pane-master .ms-block.semester { border:2px dashed #fff; box-shadow:0 0 0 2px var(--ms-navy), 0 1px 2px rgba(0,0,0,0.15); }
 #pane-master .ms-block.semester.ms-dup { box-shadow:0 0 0 2px #dc2626, 0 1px 2px rgba(0,0,0,0.15); }
 .ms-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; z-index:1000; }
@@ -2866,7 +2867,12 @@ async function importLocalStorage() {
     (msState[activeFacility].blocks||[]).forEach(function(b){
       if (b.day===activeDay && blockCat(b)==='junior'){ const lv=b.level||''; jrLevelCount[lv]=(jrLevelCount[lv]||0)+1; }
     });
-    function isDupJr(b){ return blockCat(b)==='junior' && (jrLevelCount[b.level||'']||0) > 1; }
+    const dupGroupKey = {}; // level -> "A","B",...
+    let dupIdx = 0;
+    Object.keys(jrLevelCount).forEach(function(lv){
+      if (jrLevelCount[lv] > 1) { dupGroupKey[lv] = dupIdx < 26 ? String.fromCharCode(65+dupIdx) : '*'; dupIdx++; }
+    });
+    function dupKeyFor(b){ return (blockCat(b)==='junior') ? (dupGroupKey[b.level||''] || '') : ''; }
     let html = '<div class="ms-gh">Time</div>';
     for (let i = 0; i < COURT_LABELS.length; i++){
       const lbl = COURT_LABELS[i];
@@ -2902,12 +2908,14 @@ async function importLocalStorage() {
         const noteFlag = b.notes ? '<span class="ms-bnoteflag" title="'+esc(b.notes)+'">&#9998;</span>' : '';
         const ct = b.courts.length > 1 ? ' . Cts ' + b.courts.map(function(x){ return COURT_LABELS[x-1]; }).join(',') : '';
         const noteHtml = b.notes ? '<div class="ms-bnote">'+esc(b.notes)+'</div>' : '';
-        const dup = isDupJr(b);
-        const dupWarn = dup ? 'Duplicate: another &quot;'+esc(b.level||'')+'&quot; junior class is on this day at this facility.' : '';
+        const dKey = dupKeyFor(b);
+        const dup = !!dKey;
+        const dupWarn = dup ? 'Pair '+dKey+': another &quot;'+esc(b.level||'')+'&quot; junior class on this day at this facility' : '';
         const titleParts = [b.notes ? esc(b.notes) : '', dupWarn].filter(Boolean);
         const titleAttr = titleParts.length ? ' title="'+titleParts.join(' — ')+'"' : '';
-        const dupBadge = dup ? '<span class="ms-dupbadge" title="'+dupWarn+'">&#9888;</span>' : '';
-        html += '<div class="ms-block '+semCls+(dup?' ms-dup':'')+'" data-id="'+b.id+'"'+titleAttr+' style="top:'+top+'px;height:'+height+'px;background:'+blockColor(b)+';"><div class="ms-badges">'+semBadge+dupBadge+noteFlag+'</div><div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div>'+noteHtml+'<div class="ms-resize"></div></div>';
+        const dupBadge = dup ? '<span class="ms-dupbadge" title="'+dupWarn+'">&#9888; '+dKey+'</span>' : '';
+        const dupAttr = dup ? ' data-dupkey="'+dKey+'"' : '';
+        html += '<div class="ms-block '+semCls+(dup?' ms-dup':'')+'" data-id="'+b.id+'"'+dupAttr+titleAttr+' style="top:'+top+'px;height:'+height+'px;background:'+blockColor(b)+';"><div class="ms-badges">'+semBadge+dupBadge+noteFlag+'</div><div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div>'+noteHtml+'<div class="ms-resize"></div></div>';
       }
       html += '</div>';
     }
@@ -2918,6 +2926,16 @@ async function importLocalStorage() {
       col.addEventListener('mousedown', onColMouseDown);
     });
     wireBlocks(g);
+    // Hover a duplicate junior block -> highlight its partner(s).
+    g.querySelectorAll('.ms-block[data-dupkey]').forEach(function(el){
+      el.addEventListener('mouseenter', function(){
+        const k = el.dataset.dupkey;
+        g.querySelectorAll('.ms-block[data-dupkey="'+k+'"]').forEach(function(p){ p.classList.add('peer-hover'); });
+      });
+      el.addEventListener('mouseleave', function(){
+        g.querySelectorAll('.ms-block.peer-hover').forEach(function(p){ p.classList.remove('peer-hover'); });
+      });
+    });
   }
 
   function wireBlocks(g){
