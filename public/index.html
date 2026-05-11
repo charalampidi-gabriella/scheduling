@@ -54,6 +54,7 @@
 #pane-master .ms-slot { border-top:1px solid var(--ms-border); }
 #pane-master .ms-slot.hour { border-top-color:#c2cdcf; }
 #pane-master .ms-slot.half { border-top-style:dashed; border-top-color:#ecf0f1; }
+#pane-master .ms-slot.evening-start { border-top:2px solid var(--ms-blue); }
 #pane-master .ms-camp { position:absolute; left:0; right:0; background:var(--ms-camp); border-top:2px dotted var(--ms-camp-edge); border-bottom:2px dotted var(--ms-camp-edge); pointer-events:none; z-index:1; }
 #pane-master .ms-camp-lbl { position:absolute; bottom:2px; left:4px; font-size:9px; color:var(--ms-navy); font-weight:600; letter-spacing:0.5px; opacity:0.7; }
 #pane-master .ms-gap { position:absolute; left:0; right:0; height:0; border-top:2px dashed var(--ms-muted); pointer-events:none; z-index:2; }
@@ -2639,8 +2640,8 @@ async function importLocalStorage() {
   function fmt12(t){ const a = t.split(':').map(Number); const h=a[0], m=a[1]; const p=h>=12?'p':'a'; const hh=((h+11)%12)+1; return m===0?(hh+p):(hh+':'+pad(m)+p); }
   function uid(){ return Math.random().toString(36).slice(2,9); }
   function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
-  function slotToY(s){ return (s < FIRST_EVENING_SLOT ? s : s+1) * SLOT_PX; }
-  function yToSlotF(y){ const r = y / SLOT_PX; if (r < FIRST_EVENING_SLOT) return r; if (r < FIRST_EVENING_SLOT + 1) return FIRST_EVENING_SLOT; return r - 1; }
+  function slotToY(s){ return s * SLOT_PX; }
+  function yToSlotF(y){ return y / SLOT_PX; }
 
   async function bootstrapMS(){
     try {
@@ -2794,9 +2795,13 @@ async function importLocalStorage() {
     }
     return h;
   }
-  function eveningCoachCellHTML(c0){
+  function eveningCoachRowHTML(){
     const r = getRosterDay();
-    return '<div class="ms-ghc"><input data-shift="evening" data-court="'+c0+'" placeholder="Coach" value="'+esc(r.evening[c0]||'')+'"></div>';
+    let h = '<div class="ms-ghc label evening">Evening . '+EVENING_RANGE.label+'</div>';
+    for (let c = 0; c < COURT_COUNT; c++){
+      h += '<div class="ms-ghc"><input data-shift="evening" data-court="'+c+'" placeholder="Coach" value="'+esc(r.evening[c]||'')+'"></div>';
+    }
+    return h;
   }
 
   function renderPool(){
@@ -2860,17 +2865,16 @@ async function importLocalStorage() {
     html += morningCoachRowHTML();
     html += '<div class="ms-tcol">';
     for (let s = 0; s < TOTAL_SLOTS; s++){
-      if (s === FIRST_EVENING_SLOT) html += '<div class="ms-tlabel hour" style="font-weight:700;color:#2596b5;">Evening</div>';
       const t = slotToTime(s); const isHour = t.indexOf(':00') !== -1 && t.endsWith(':00');
-      html += '<div class="ms-tlabel '+(isHour?'hour':'')+'">'+(isHour?fmt12(t):'')+'</div>';
+      const isEve = (s === FIRST_EVENING_SLOT);
+      html += '<div class="ms-tlabel '+(isHour?'hour':'')+'"'+(isEve?' style="color:#2596b5;font-weight:700;"':'')+'>'+(isHour?fmt12(t):'')+'</div>';
     }
     html += '</div>';
     for (let c = 1; c <= COURT_COUNT; c++){
       html += '<div class="ms-ccol" data-court="'+c+'">';
       for (let s = 0; s < TOTAL_SLOTS; s++){
-        if (s === FIRST_EVENING_SLOT) html += eveningCoachCellHTML(c-1);
         const t = slotToTime(s); const isHour = t.endsWith(':00');
-        html += '<div class="ms-slot '+(isHour?'hour':'half')+'" data-slot="'+s+'"></div>';
+        html += '<div class="ms-slot '+(isHour?'hour':'half')+(s===FIRST_EVENING_SLOT?' evening-start':'')+'" data-slot="'+s+'"></div>';
       }
       if (activeDay <= 3) {
         const top = slotToY(timeToSlot('09:30'));
@@ -2896,6 +2900,7 @@ async function importLocalStorage() {
       }
       html += '</div>';
     }
+    html += eveningCoachRowHTML();
     g.innerHTML = html;
     wireCoachInputs(g);
     g.querySelectorAll('.ms-ccol').forEach(function(col){
@@ -2961,10 +2966,7 @@ async function importLocalStorage() {
   function slotFromEvent(colEl, e){
     const rect = colEl.getBoundingClientRect();
     const y = e.clientY - rect.top;
-    const row = Math.floor(y / SLOT_PX);
-    if (row <= FIRST_EVENING_SLOT - 1) return Math.max(0, row);
-    if (row === FIRST_EVENING_SLOT) return FIRST_EVENING_SLOT;
-    return Math.min(TOTAL_SLOTS - 1, row - 1);
+    return Math.max(0, Math.min(TOTAL_SLOTS - 1, Math.floor(y / SLOT_PX)));
   }
   function onColClick(e){ const b = e.target.closest('.ms-block'); if (b) openEdit(b.dataset.id); }
   function onColMouseDown(e){
