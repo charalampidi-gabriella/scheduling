@@ -58,8 +58,12 @@
 #pane-master .ms-gap { position:absolute; left:0; right:0; background:repeating-linear-gradient(45deg, rgba(0,0,0,0.04), rgba(0,0,0,0.04) 6px, rgba(0,0,0,0.08) 6px, rgba(0,0,0,0.08) 12px); border-top:1px dashed var(--ms-muted); border-bottom:1px dashed var(--ms-muted); pointer-events:none; z-index:2; }
 #pane-master .ms-gap-lbl { position:absolute; bottom:1px; right:4px; font-size:9px; color:var(--ms-muted); letter-spacing:0.5px; }
 #pane-master .ms-preview { position:absolute; left:0; right:0; background:rgba(149,214,0,0.35); border:2px dashed var(--ms-navy); border-radius:4px; pointer-events:none; z-index:4; color:var(--ms-navy); font-size:11px; padding:4px 6px; font-weight:600; }
-#pane-master .ms-block { position:absolute; left:2px; right:2px; background:var(--ms-blue); color:#fff; border-radius:4px; padding:5px 7px; font-size:12px; line-height:1.3; overflow:hidden; cursor:pointer; z-index:3; border:2px solid transparent; box-shadow:0 1px 2px rgba(0,0,0,0.08); }
+#pane-master .ms-block { position:absolute; left:2px; right:2px; background:var(--ms-blue); color:#fff; border-radius:4px; padding:5px 7px; font-size:12px; line-height:1.3; overflow:hidden; cursor:move; z-index:3; border:2px solid transparent; box-shadow:0 1px 2px rgba(0,0,0,0.08); }
 #pane-master .ms-block:hover { filter:brightness(1.08); }
+#pane-master .ms-block.dragging { opacity:0.8; box-shadow:0 6px 16px rgba(0,0,0,0.3); z-index:10; }
+#pane-master .ms-block .ms-resize { position:absolute; left:0; right:0; bottom:0; height:8px; cursor:ns-resize; }
+#pane-master .ms-block .ms-resize::after { content:''; position:absolute; left:50%; bottom:2px; transform:translateX(-50%); width:22px; height:3px; border-radius:2px; background:rgba(255,255,255,0.55); }
+#pane-master .ms-block:hover .ms-resize::after { background:rgba(255,255,255,0.9); }
 #pane-master .ms-block .ms-btitle { font-weight:700; }
 #pane-master .ms-block .ms-bmeta { font-size:10px; opacity:0.95; margin-top:1px; }
 #pane-master .ms-block.semester { border:2px dashed #fff; box-shadow:0 0 0 2px var(--ms-navy), 0 1px 2px rgba(0,0,0,0.15); }
@@ -2583,6 +2587,7 @@ async function importLocalStorage() {
   function uid(){ return Math.random().toString(36).slice(2,9); }
   function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
   function slotToY(s){ return (s < FIRST_EVENING_SLOT ? s : s+1) * SLOT_PX; }
+  function yToSlotF(y){ const r = y / SLOT_PX; if (r < FIRST_EVENING_SLOT) return r; if (r < FIRST_EVENING_SLOT + 1) return FIRST_EVENING_SLOT; return r - 1; }
 
   async function bootstrapMS(){
     try {
@@ -2832,7 +2837,7 @@ async function importLocalStorage() {
         const semCls = b.semester ? 'semester' : '';
         const semBadge = b.semester ? '<span class="ms-sembadge">SEM</span>' : '';
         const ct = b.courts.length > 1 ? ' . Cts ' + b.courts.map(function(x){ return COURT_LABELS[x-1]; }).join(',') : '';
-        html += '<div class="ms-block '+semCls+'" data-id="'+b.id+'" style="top:'+top+'px;height:'+height+'px;background:'+(b.color||'#2596b5')+';">'+semBadge+'<div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div></div>';
+        html += '<div class="ms-block '+semCls+'" data-id="'+b.id+'" style="top:'+top+'px;height:'+height+'px;background:'+(b.color||'#2596b5')+';">'+semBadge+'<div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div><div class="ms-resize"></div></div>';
       }
       html += '</div>';
     }
@@ -2840,7 +2845,61 @@ async function importLocalStorage() {
     wireCoachInputs(g);
     g.querySelectorAll('.ms-ccol').forEach(function(col){
       col.addEventListener('mousedown', onColMouseDown);
-      col.addEventListener('click', onColClick);
+    });
+    wireBlocks(g);
+  }
+
+  function wireBlocks(g){
+    g.querySelectorAll('.ms-block').forEach(function(el){
+      el.addEventListener('mousedown', function(e){
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        const id = el.dataset.id;
+        const b = msState[activeFacility].blocks.find(function(x){ return x.id===id; });
+        if (!b) return;
+        const isResize = !!(e.target.closest && e.target.closest('.ms-resize'));
+        const s0 = timeToSlot(b.start), e0 = timeToSlot(b.end);
+        const dur = e0 - s0;
+        const startY = e.clientY;
+        const meta = el.querySelector('.ms-bmeta');
+        const ctTxt = (b.courts && b.courts.length > 1) ? ' . Cts ' + b.courts.map(function(x){ return COURT_LABELS[x-1]; }).join(',') : '';
+        let moved = false, cur = { start:s0, end:e0 };
+        function paint(){
+          const top = slotToY(cur.start), height = slotToY(cur.end) - top - 2;
+          el.style.top = top + 'px'; el.style.height = height + 'px';
+          if (meta) meta.textContent = fmt12(slotToTime(cur.start)) + '-' + fmt12(slotToTime(cur.end)) + ctTxt;
+        }
+        function onMove(ev){
+          const dy = ev.clientY - startY;
+          if (Math.abs(dy) > 3) moved = true;
+          if (isResize){
+            let ne = Math.round(yToSlotF(slotToY(e0) + dy));
+            ne = Math.max(s0 + 1, Math.min(TOTAL_SLOTS, ne));
+            cur = { start:s0, end:ne };
+          } else {
+            let ns = Math.round(yToSlotF(slotToY(s0) + dy));
+            ns = Math.max(0, Math.min(TOTAL_SLOTS - dur, ns));
+            cur = { start:ns, end:ns + dur };
+          }
+          paint();
+        }
+        function onUp(){
+          window.removeEventListener('mousemove', onMove);
+          document.body.style.cursor = '';
+          el.classList.remove('dragging');
+          if (!moved){ if (!isResize) openEdit(id); return; }
+          if (cur.start===s0 && cur.end===e0){ renderGrid(); return; }
+          b.start = slotToTime(cur.start);
+          b.end = slotToTime(cur.end);
+          persist(activeFacility);
+          renderGrid();
+        }
+        el.classList.add('dragging');
+        document.body.style.cursor = isResize ? 'ns-resize' : 'grabbing';
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp, { once:true });
+        e.preventDefault();
+      });
     });
   }
 
