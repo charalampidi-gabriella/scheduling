@@ -67,6 +67,7 @@
 #pane-master .ms-block:hover .ms-resize::after { background:rgba(255,255,255,0.9); }
 #pane-master .ms-block .ms-btitle { font-weight:700; }
 #pane-master .ms-block .ms-bmeta { font-size:10px; opacity:0.95; margin-top:1px; }
+#pane-master .ms-block .ms-bnote { font-size:10px; line-height:1.25; margin-top:3px; padding-top:3px; border-top:1px solid rgba(255,255,255,0.35); opacity:0.95; white-space:normal; word-break:break-word; }
 #pane-master .ms-block.semester { border:2px dashed #fff; box-shadow:0 0 0 2px var(--ms-navy), 0 1px 2px rgba(0,0,0,0.15); }
 #pane-master .ms-block .ms-sembadge { position:absolute; top:3px; right:5px; font-size:9px; background:rgba(0,0,0,0.3); padding:1px 5px; border-radius:3px; font-weight:700; letter-spacing:0.5px; }
 .ms-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; z-index:1000; }
@@ -2888,7 +2889,9 @@ async function importLocalStorage() {
         const semCls = b.semester ? 'semester' : '';
         const semBadge = b.semester ? '<span class="ms-sembadge">SEM</span>' : '';
         const ct = b.courts.length > 1 ? ' . Cts ' + b.courts.map(function(x){ return COURT_LABELS[x-1]; }).join(',') : '';
-        html += '<div class="ms-block '+semCls+'" data-id="'+b.id+'" style="top:'+top+'px;height:'+height+'px;background:'+blockColor(b)+';">'+semBadge+'<div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div><div class="ms-resize"></div></div>';
+        const noteHtml = b.notes ? '<div class="ms-bnote">'+esc(b.notes)+'</div>' : '';
+        const titleAttr = b.notes ? ' title="'+esc(b.notes)+'"' : '';
+        html += '<div class="ms-block '+semCls+'" data-id="'+b.id+'"'+titleAttr+' style="top:'+top+'px;height:'+height+'px;background:'+blockColor(b)+';">'+semBadge+'<div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div>'+noteHtml+'<div class="ms-resize"></div></div>';
       }
       html += '</div>';
     }
