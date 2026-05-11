@@ -2382,7 +2382,8 @@ function setTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   ['overview', 'location', 'coach', 'requests', 'config', 'master'].forEach(t => {
-    document.getElementById(`pane-${t}`).classList.toggle('hidden', t !== tab);
+    const el = document.getElementById(`pane-${t}`);
+    if (el) el.classList.toggle('hidden', t !== tab);
   });
   if (tab !== 'master') render();
 }
