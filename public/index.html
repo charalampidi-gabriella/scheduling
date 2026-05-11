@@ -464,6 +464,7 @@ tr.coach-locked > td.t-today { background: #fef9c3 !important; }
   <button class="tab-btn"        data-tab="coach"    onclick="setTab('coach')">Coach</button>
   <button class="tab-btn"        data-tab="requests" onclick="setTab('requests')" id="req-tab">Requests</button>
   <button class="tab-btn"        data-tab="config"   onclick="setTab('config')">Config</button>
+  <button class="tab-btn"        data-tab="master"   onclick="setTab('master')">Master Schedule</button>
 </div>
 
 <div id="main">
@@ -472,6 +473,9 @@ tr.coach-locked > td.t-today { background: #fef9c3 !important; }
   <div id="pane-coach"     class="hidden"></div>
   <div id="pane-requests"  class="hidden"></div>
   <div id="pane-config"    class="hidden"></div>
+  <div id="pane-master"    class="hidden" style="padding:0;margin:0;">
+    <iframe src="https://master-schedule.pages.dev/" style="width:100%;height:calc(100vh - 220px);border:0;display:block;"></iframe>
+  </div>
 </div>
 
 <div id="modal-root"></div>
@@ -2377,10 +2381,10 @@ function bgClose(e)   { if (e.target.classList.contains('overlay')) closeModal()
 function setTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  ['overview', 'location', 'coach', 'requests', 'config'].forEach(t => {
+  ['overview', 'location', 'coach', 'requests', 'config', 'master'].forEach(t => {
     document.getElementById(`pane-${t}`).classList.toggle('hidden', t !== tab);
   });
-  render();
+  if (tab !== 'master') render();
 }
 
 // ── IMPORT FROM LOCALSTORAGE (one-time migration) ─────────────────────────────
