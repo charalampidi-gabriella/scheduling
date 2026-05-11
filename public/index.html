@@ -19,6 +19,7 @@
 #pane-master .ms-sample.sem { border:2px dashed var(--ms-navy); background:#fff; }
 #pane-master .ms-sample.reg { background:var(--ms-blue); }
 #pane-master .ms-sample.jr { background:#f57c00; }
+#pane-master .ms-sample.priv { background:#d4a017; }
 #pane-master .ms-sample.band { background:var(--ms-camp); border-top:2px dotted var(--ms-camp-edge); border-bottom:2px dotted var(--ms-camp-edge); }
 #pane-master button.ms-btn { padding:6px 12px; border:1px solid var(--ms-border); background:#fff; border-radius:5px; cursor:pointer; font-size:13px; }
 #pane-master button.ms-btn:hover { background:var(--ms-plat); }
@@ -2699,6 +2700,7 @@ async function importLocalStorage() {
         '<span class="ms-legend">' +
           '<span><span class="ms-sample reg"></span>Adult</span>' +
           '<span><span class="ms-sample jr"></span>Junior</span>' +
+          '<span><span class="ms-sample priv"></span>Private</span>' +
           '<span><span class="ms-sample sem"></span>Semester</span>' +
           '<span><span class="ms-sample band"></span>Summer camp band (Mon-Thu 9:30-12:30)</span>' +
         '</span>' +
@@ -2999,8 +3001,12 @@ async function importLocalStorage() {
     openCreate(activeDay, slotToTime(a), slotToTime(b), court);
   }
 
-  function catColor(cat){ return cat==='junior' ? '#f57c00' : '#2596b5'; }
-  function blockColor(b){ return catColor(b.category || (b.juniorAge ? 'junior' : 'adult')); }
+  function isPrivate(b){ return (b.adultLevel === 'Private') || (b.level === 'Private') || (typeof b.level === 'string' && /\bprivate\b/i.test(b.level)); }
+  function blockColor(b){
+    const cat = b.category || (b.juniorAge ? 'junior' : 'adult');
+    if (cat === 'adult' && isPrivate(b)) return '#d4a017';
+    return cat === 'junior' ? '#f57c00' : '#2596b5';
+  }
   function refreshCourtChips(){
     const el = document.getElementById('ms-f-courts');
     el.innerHTML = COURT_LABELS.map(function(lbl,i){
@@ -3081,9 +3087,9 @@ async function importLocalStorage() {
     const extras = { category: category, adultLevel: category==='adult'?adultLevel:null, juniorAge: category==='junior'?juniorAge:null, juniorSkill: category==='junior'?juniorSkill:null };
     if (editingId){
       const b = blocks.find(function(x){ return x.id===editingId; });
-      Object.assign(b, { level: level, day: day, start: start, end: end, notes: notes, semester: semester, color: catColor(category), courts: courts }, extras);
+      Object.assign(b, { level: level, day: day, start: start, end: end, notes: notes, semester: semester, color: blockColor(Object.assign({ category:category, level:level }, extras)), courts: courts }, extras);
     } else {
-      const obj = Object.assign({ id: uid(), level: level, day: day, start: start, end: end, notes: notes, semester: semester, color: catColor(category), courts: courts }, extras);
+      const obj = Object.assign({ id: uid(), level: level, day: day, start: start, end: end, notes: notes, semester: semester, color: blockColor(Object.assign({ category:category, level:level }, extras)), courts: courts }, extras);
       blocks.push(obj);
     }
     if (day !== activeDay) activeDay = day;
