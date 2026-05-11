@@ -5,6 +5,86 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Coach Scheduler</title>
 <style>
+/* Master Schedule pane (scoped under #pane-master) */
+#pane-master { --ms-green:#95d600; --ms-navy:#1b4458; --ms-blue:#2596b5; --ms-plat:#F1F5F5; --ms-border:#d8e1e3; --ms-muted:#6b7c83; --ms-camp:rgba(149,214,0,0.10); padding:0 0 40px; user-select:none; }
+#pane-master .ms-bar { display:flex; gap:4px; padding:8px 0 0; }
+#pane-master .ms-tab { padding:8px 16px; border:1px solid transparent; border-bottom:none; border-radius:6px 6px 0 0; background:transparent; cursor:pointer; font-size:14px; color:var(--ms-muted); }
+#pane-master .ms-tab.active { background:var(--ms-plat); color:var(--ms-navy); border-color:var(--ms-border); font-weight:600; }
+#pane-master .ms-daybar { display:flex; gap:6px; padding:10px; flex-wrap:wrap; background:var(--ms-plat); border-top:1px solid var(--ms-border); border-bottom:1px solid var(--ms-border); }
+#pane-master .ms-daytab { padding:6px 14px; border:1px solid var(--ms-border); border-radius:999px; background:#fff; cursor:pointer; font-size:13px; color:var(--ms-muted); }
+#pane-master .ms-daytab.active { background:var(--ms-navy); color:#fff; border-color:var(--ms-navy); font-weight:600; }
+#pane-master .ms-toolbar { padding:10px 0; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px; }
+#pane-master .ms-toolbar .ms-legend { display:flex; gap:14px; margin-left:auto; align-items:center; color:var(--ms-muted); }
+#pane-master .ms-sample { display:inline-block; width:18px; height:12px; border-radius:3px; vertical-align:middle; margin-right:5px; }
+#pane-master .ms-sample.sem { border:2px dashed var(--ms-navy); background:#fff; }
+#pane-master .ms-sample.reg { background:var(--ms-blue); }
+#pane-master .ms-sample.band { background:var(--ms-camp); border-top:2px dotted var(--ms-navy); border-bottom:2px dotted var(--ms-navy); }
+#pane-master button.ms-btn { padding:6px 12px; border:1px solid var(--ms-border); background:#fff; border-radius:5px; cursor:pointer; font-size:13px; }
+#pane-master button.ms-btn:hover { background:var(--ms-plat); }
+#pane-master button.ms-btn.primary { background:var(--ms-navy); color:#fff; border-color:var(--ms-navy); }
+#pane-master button.ms-btn.danger { background:#fff; color:#b00020; border-color:#f2c7cd; }
+#pane-master .ms-pool { padding:0 0 10px; }
+#pane-master .ms-pool-row { display:flex; gap:6px; align-items:center; padding:6px 0; flex-wrap:wrap; }
+#pane-master .ms-pool-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--ms-navy); min-width:140px; }
+#pane-master .ms-pool-label.morning { border-left:4px solid var(--ms-navy); padding-left:8px; }
+#pane-master .ms-pool-label.evening { border-left:4px solid var(--ms-blue); padding-left:8px; }
+#pane-master .ms-chip { display:inline-block; padding:4px 10px; background:#fff; border:1px solid var(--ms-border); border-radius:999px; font-size:12px; color:var(--ms-navy); cursor:grab; }
+#pane-master .ms-chip:active { cursor:grabbing; }
+#pane-master .ms-chip.assigned { opacity:0.4; }
+#pane-master .ms-pool-empty { color:var(--ms-muted); font-size:12px; font-style:italic; }
+#pane-master .ms-grid { display:grid; grid-template-columns:80px repeat(6,1fr); border:1px solid var(--ms-border); border-radius:6px; overflow:hidden; background:#fff; }
+#pane-master .ms-gh { background:var(--ms-plat); padding:10px 6px; font-size:13px; font-weight:700; color:var(--ms-navy); text-align:center; border-bottom:1px solid var(--ms-border); border-right:1px solid var(--ms-border); }
+#pane-master .ms-gh:last-child { border-right:none; }
+#pane-master .ms-ghc { background:#fff; border-bottom:1px solid var(--ms-border); border-right:1px solid var(--ms-border); padding:0; min-height:32px; display:flex; align-items:stretch; }
+#pane-master .ms-ghc:last-child { border-right:none; }
+#pane-master .ms-ghc.label { background:var(--ms-plat); justify-content:center; align-items:center; font-size:10px; color:var(--ms-navy); font-weight:700; text-transform:uppercase; letter-spacing:0.6px; padding:0 6px; }
+#pane-master .ms-ghc.label.morning { border-left:4px solid var(--ms-navy); }
+#pane-master .ms-ghc.label.evening { border-left:4px solid var(--ms-blue); }
+#pane-master .ms-ghc input { width:100%; border:none; background:transparent; padding:4px 8px; font:inherit; font-size:12px; color:var(--ms-navy); font-weight:600; }
+#pane-master .ms-ghc input:hover { background:var(--ms-plat); }
+#pane-master .ms-ghc input:focus { outline:none; background:rgba(149,214,0,0.12); box-shadow:inset 0 0 0 2px var(--ms-green); }
+#pane-master .ms-ghc input::placeholder { color:#b0bcc1; font-weight:400; }
+#pane-master .ms-ghc.drop-target { background:rgba(149,214,0,0.18); box-shadow:inset 0 0 0 2px var(--ms-green); }
+#pane-master .ms-tcol { display:grid; grid-auto-rows:36px; border-right:1px solid var(--ms-border); }
+#pane-master .ms-tlabel { font-size:12px; color:var(--ms-muted); padding:0 8px; border-top:1px solid var(--ms-border); display:flex; align-items:flex-start; justify-content:flex-end; padding-top:2px; background:var(--ms-plat); }
+#pane-master .ms-tlabel.hour { font-weight:600; color:var(--ms-navy); }
+#pane-master .ms-ccol { position:relative; display:grid; grid-auto-rows:36px; border-right:1px solid var(--ms-border); cursor:cell; }
+#pane-master .ms-ccol:last-child { border-right:none; }
+#pane-master .ms-slot { border-top:1px solid var(--ms-border); }
+#pane-master .ms-slot.hour { border-top-color:#c2cdcf; }
+#pane-master .ms-slot.half { border-top-style:dashed; border-top-color:#ecf0f1; }
+#pane-master .ms-camp { position:absolute; left:0; right:0; background:var(--ms-camp); border-top:2px dotted var(--ms-navy); border-bottom:2px dotted var(--ms-navy); pointer-events:none; z-index:1; }
+#pane-master .ms-camp-lbl { position:absolute; bottom:2px; left:4px; font-size:9px; color:var(--ms-navy); font-weight:600; letter-spacing:0.5px; opacity:0.7; }
+#pane-master .ms-gap { position:absolute; left:0; right:0; background:repeating-linear-gradient(45deg, rgba(0,0,0,0.04), rgba(0,0,0,0.04) 6px, rgba(0,0,0,0.08) 6px, rgba(0,0,0,0.08) 12px); border-top:1px dashed var(--ms-muted); border-bottom:1px dashed var(--ms-muted); pointer-events:none; z-index:2; }
+#pane-master .ms-gap-lbl { position:absolute; bottom:1px; right:4px; font-size:9px; color:var(--ms-muted); letter-spacing:0.5px; }
+#pane-master .ms-preview { position:absolute; left:0; right:0; background:rgba(149,214,0,0.35); border:2px dashed var(--ms-navy); border-radius:4px; pointer-events:none; z-index:4; color:var(--ms-navy); font-size:11px; padding:4px 6px; font-weight:600; }
+#pane-master .ms-block { position:absolute; left:2px; right:2px; background:var(--ms-blue); color:#fff; border-radius:4px; padding:5px 7px; font-size:12px; line-height:1.3; overflow:hidden; cursor:pointer; z-index:3; border:2px solid transparent; box-shadow:0 1px 2px rgba(0,0,0,0.08); }
+#pane-master .ms-block:hover { filter:brightness(1.08); }
+#pane-master .ms-block .ms-btitle { font-weight:700; }
+#pane-master .ms-block .ms-bmeta { font-size:10px; opacity:0.95; margin-top:1px; }
+#pane-master .ms-block.semester { border:2px dashed #fff; box-shadow:0 0 0 2px var(--ms-navy), 0 1px 2px rgba(0,0,0,0.15); }
+#pane-master .ms-block .ms-sembadge { position:absolute; top:3px; right:5px; font-size:9px; background:rgba(0,0,0,0.3); padding:1px 5px; border-radius:3px; font-weight:700; letter-spacing:0.5px; }
+.ms-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; z-index:1000; }
+.ms-overlay.open { display:flex; }
+.ms-overlay .ms-modal { background:#fff; border-radius:8px; width:min(520px,92vw); padding:22px; max-height:90vh; overflow:auto; }
+.ms-overlay .ms-modal h2 { margin:0 0 14px; font-size:17px; color:#1b4458; }
+.ms-overlay .ms-row { display:flex; gap:10px; margin-bottom:10px; }
+.ms-overlay .ms-row > * { flex:1; }
+.ms-overlay .ms-field { display:flex; flex-direction:column; font-size:12px; color:#6b7c83; gap:4px; }
+.ms-overlay .ms-field input, .ms-overlay .ms-field select, .ms-overlay .ms-field textarea { padding:7px 9px; border:1px solid #d8e1e3; border-radius:4px; font-size:13px; color:#1a2326; font-family:inherit; }
+.ms-overlay .ms-check { display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; }
+.ms-overlay .ms-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:18px; }
+.ms-overlay .ms-swatches { display:flex; gap:6px; flex-wrap:wrap; }
+.ms-overlay .ms-swatch { width:26px; height:26px; border-radius:4px; cursor:pointer; border:2px solid transparent; }
+.ms-overlay .ms-swatch.selected { border-color:#1b4458; }
+.ms-overlay .ms-court-chips { display:flex; gap:6px; flex-wrap:wrap; }
+.ms-overlay .ms-court-chip { padding:5px 12px; border:1px solid #d8e1e3; background:#fff; border-radius:999px; cursor:pointer; font-size:13px; min-width:40px; text-align:center; }
+.ms-overlay .ms-court-chip.on { background:#1b4458; color:#fff; border-color:#1b4458; font-weight:600; }
+.ms-overlay button.ms-btn { padding:6px 12px; border:1px solid #d8e1e3; background:#fff; border-radius:5px; cursor:pointer; font-size:13px; }
+.ms-overlay button.ms-btn.primary { background:#1b4458; color:#fff; border-color:#1b4458; }
+.ms-overlay button.ms-btn.danger { background:#fff; color:#b00020; border-color:#f2c7cd; }
+</style>
+<style>
 :root {
   --satc:    #2563eb; --satc-bg:  #eff6ff; --satc-b:  #bfdbfe;
   --pharr:   #16a34a; --pharr-bg: #f0fdf4; --pharr-b: #bbf7d0;
@@ -473,9 +553,7 @@ tr.coach-locked > td.t-today { background: #fef9c3 !important; }
   <div id="pane-coach"     class="hidden"></div>
   <div id="pane-requests"  class="hidden"></div>
   <div id="pane-config"    class="hidden"></div>
-  <div id="pane-master"    class="hidden" style="padding:0;margin:0;">
-    <iframe src="https://master-schedule.pages.dev/" style="width:100%;height:calc(100vh - 220px);border:0;display:block;"></iframe>
-  </div>
+  <div id="pane-master"    class="hidden"></div>
 </div>
 
 <div id="modal-root"></div>
@@ -2385,7 +2463,12 @@ function setTab(tab) {
     const el = document.getElementById(`pane-${t}`);
     if (el) el.classList.toggle('hidden', t !== tab);
   });
-  if (tab !== 'master') render();
+  if (tab === 'master') {
+    if (window.MS) window.MS.open();
+    else { const p = document.getElementById('pane-master'); if (p) p.innerHTML = '<div style="padding:20px;color:#b00020;font-family:monospace">Master Schedule module did not initialize. Open the browser console (F12) for errors.</div>'; }
+  } else {
+    render();
+  }
 }
 
 // ── IMPORT FROM LOCALSTORAGE (one-time migration) ─────────────────────────────
@@ -2451,6 +2534,481 @@ async function importLocalStorage() {
 
   // Best-effort flush before the tab closes
   window.addEventListener('beforeunload', () => { kv.flushAll(); });
+})();
+
+// ════════════════════════════════════════════════════════════════════════════
+// Master Schedule module — exposes window.MS = { open() }.
+// ════════════════════════════════════════════════════════════════════════════
+(function(){
+  const FACILITIES = [
+    { id:'satc',  name:'SATC',  key:'master_satc'  },
+    { id:'pharr', name:'Pharr', key:'master_pharr' },
+    { id:'wilco', name:'Wilco', key:'master_wilco' },
+  ];
+  const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const COURT_LABELS = ['1','2','3','4','5','W'];
+  const COURT_COUNT = COURT_LABELS.length;
+  const SLOT_MIN = 30, START_HOUR = 6, END_HOUR = 22;
+  const SLOTS_PER_HOUR = 60 / SLOT_MIN;
+  const TOTAL_SLOTS = (END_HOUR - START_HOUR) * SLOTS_PER_HOUR;
+  const SLOT_PX = 36;
+  const FIRST_EVENING_SLOT = 18;
+  const MORNING_RANGE = { label:'6a-2p' };
+  const EVENING_RANGE = { label:'3p-10p' };
+  const COLORS = ['#2596b5','#1b4458','#95d600','#7c4dff','#f57c00','#c2185b','#00897b','#5d4037'];
+  const ADULT_LEVELS = ['Beginner','Adv Beginner 2.0-2.5','2.5-3.0','3.0','3.0-3.5','3.5','3.5-4.0','4.0','4.0-4.5','4.5','4.5-5.0'];
+  const JUNIOR_AGES = ['3-4','5-8','9-11','12-15'];
+  const JUNIOR_SKILLS = ['Beginner','Intermediate','Advanced'];
+  function juniorSkillsFor(age){ return age==='3-4' ? ['Beginner'] : JUNIOR_SKILLS; }
+  function composeLevel(cat,al,ja,js){
+    if (cat==='adult') return al || '';
+    if (cat==='junior') return 'Jr ' + ja + ' . ' + js;
+    return '';
+  }
+
+  let activeFacility = 'satc', activeDay = 0;
+  let msState = { satc:{blocks:[]}, pharr:{blocks:[]}, wilco:{blocks:[]} };
+  let pools = { satc:{}, pharr:{}, wilco:{} };
+  let editingId = null;
+  let selectedColor = COLORS[0];
+  let selectedCourts = [1];
+  let saveTimers = {};
+  let drag = null;
+  let initialized = false;
+
+  function pad(n){ return n<10 ? '0'+n : ''+n; }
+  function slotToTime(s){ const m = START_HOUR*60 + s*SLOT_MIN; return pad(Math.floor(m/60))+':'+pad(m%60); }
+  function timeToSlot(t){ const a = t.split(':').map(Number); return (a[0]-START_HOUR)*SLOTS_PER_HOUR + a[1]/SLOT_MIN; }
+  function fmt12(t){ const a = t.split(':').map(Number); const h=a[0], m=a[1]; const p=h>=12?'p':'a'; const hh=((h+11)%12)+1; return m===0?(hh+p):(hh+':'+pad(m)+p); }
+  function uid(){ return Math.random().toString(36).slice(2,9); }
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function slotToY(s){ return (s < FIRST_EVENING_SLOT ? s : s+1) * SLOT_PX; }
+
+  async function bootstrapMS(){
+    try {
+      const data = await fetch('/api/state').then(function(r){ return r.json(); });
+      for (let i = 0; i < FACILITIES.length; i++) {
+        const f = FACILITIES[i];
+        const v = data[f.key];
+        msState[f.id] = (v && typeof v==='object' && Array.isArray(v.blocks)) ? v : {blocks:[]};
+        if (!msState[f.id].roster) msState[f.id].roster = {};
+      }
+    } catch(e){ console.error('[MS] state fetch', e); }
+    try {
+      const r = await fetch('/api/pool');
+      if (r.ok) pools = await r.json();
+    } catch(e){ console.error('[MS] pool fetch', e); }
+  }
+  function persist(facId){
+    clearTimeout(saveTimers[facId]);
+    saveTimers[facId] = setTimeout(async function(){
+      const key = FACILITIES.find(function(f){ return f.id===facId; }).key;
+      try { await fetch('/api/state/'+key, { method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify(msState[facId]) }); } catch(e){}
+    }, 300);
+  }
+
+  function getRosterDay(){
+    const fac = msState[activeFacility];
+    if (!fac.roster) fac.roster = {};
+    let r = fac.roster[activeDay];
+    if (!r || !Array.isArray(r.morning) || !Array.isArray(r.evening)){
+      r = { morning: Array(COURT_COUNT).fill(''), evening: Array(COURT_COUNT).fill('') };
+      fac.roster[activeDay] = r;
+    }
+    while (r.morning.length < COURT_COUNT) r.morning.push('');
+    while (r.evening.length < COURT_COUNT) r.evening.push('');
+    return r;
+  }
+
+  function buildPane(){
+    const el = document.getElementById('pane-master');
+    if (!el) return;
+    el.innerHTML =
+      '<div class="ms-bar" id="ms-facility-tabs"></div>' +
+      '<div class="ms-daybar" id="ms-day-tabs"></div>' +
+      '<div class="ms-toolbar">' +
+        '<button class="ms-btn primary" id="ms-add-btn">+ Add class</button>' +
+        '<button class="ms-btn" id="ms-export-btn">Export JSON</button>' +
+        '<span class="ms-legend">' +
+          '<span><span class="ms-sample reg"></span>Regular</span>' +
+          '<span><span class="ms-sample sem"></span>Semester</span>' +
+          '<span><span class="ms-sample band"></span>Summer camp band (Mon-Thu 9:30-12:30)</span>' +
+        '</span>' +
+      '</div>' +
+      '<div class="ms-pool" id="ms-pool"></div>' +
+      '<div><div class="ms-grid" id="ms-grid"></div></div>' +
+      '<div class="ms-overlay" id="ms-overlay">' +
+        '<div class="ms-modal">' +
+          '<h2 id="ms-modal-title">Add class</h2>' +
+          '<label class="ms-field">Category<select id="ms-f-category"><option value="adult">Adult</option><option value="junior">Junior</option></select></label>' +
+          '<div class="ms-row" id="ms-adult-row"><label class="ms-field" style="flex:1;">Adult level<select id="ms-f-adult-level"></select></label></div>' +
+          '<div class="ms-row" id="ms-junior-row" style="display:none;">' +
+            '<label class="ms-field">Age group<select id="ms-f-junior-age"></select></label>' +
+            '<label class="ms-field">Skill<select id="ms-f-junior-skill"></select></label>' +
+          '</div>' +
+          '<div class="ms-row">' +
+            '<label class="ms-field">Day<select id="ms-f-day"></select></label>' +
+            '<label class="ms-field">Start<select id="ms-f-start"></select></label>' +
+            '<label class="ms-field">End<select id="ms-f-end"></select></label>' +
+          '</div>' +
+          '<label class="ms-field" style="margin-bottom:10px;">Courts<div id="ms-f-courts" class="ms-court-chips"></div></label>' +
+          '<label class="ms-field">Notes<textarea id="ms-f-notes" rows="2"></textarea></label>' +
+          '<div class="ms-row" style="align-items:flex-end;">' +
+            '<label class="ms-field">Color<div class="ms-swatches" id="ms-f-colors"></div></label>' +
+            '<label class="ms-check"><input id="ms-f-semester" type="checkbox"> Semester class</label>' +
+          '</div>' +
+          '<div class="ms-actions">' +
+            '<button class="ms-btn danger" id="ms-delete-btn" style="margin-right:auto; display:none;">Delete</button>' +
+            '<button class="ms-btn" id="ms-cancel-btn">Cancel</button>' +
+            '<button class="ms-btn primary" id="ms-save-btn">Save</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    document.getElementById('ms-f-day').innerHTML = DAYS.map(function(d,i){ return '<option value="'+i+'">'+d+'</option>'; }).join('');
+    let topts = '';
+    for (let s = 0; s <= TOTAL_SLOTS; s++){ const t = slotToTime(s); topts += '<option value="'+t+'">'+fmt12(t)+' ('+t+')</option>'; }
+    document.getElementById('ms-f-start').innerHTML = topts;
+    document.getElementById('ms-f-end').innerHTML = topts;
+    document.getElementById('ms-f-adult-level').innerHTML = ADULT_LEVELS.map(function(l){ return '<option value="'+l+'">'+l+'</option>'; }).join('');
+    document.getElementById('ms-f-junior-age').innerHTML = JUNIOR_AGES.map(function(a){ return '<option value="'+a+'">'+a+'</option>'; }).join('');
+    refreshJuniorSkills();
+
+    document.getElementById('ms-add-btn').onclick = function(){ openCreate(activeDay,'09:00','10:00',1); };
+    document.getElementById('ms-cancel-btn').onclick = closeModal;
+    document.getElementById('ms-save-btn').onclick = saveModal;
+    document.getElementById('ms-delete-btn').onclick = deleteBlock;
+    document.getElementById('ms-overlay').onclick = function(e){ if (e.target.id==='ms-overlay') closeModal(); };
+    document.getElementById('ms-export-btn').onclick = function(){
+      const blob = new Blob([JSON.stringify(msState,null,2)], {type:'application/json'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'master-schedule.json'; a.click();
+    };
+    document.getElementById('ms-f-category').addEventListener('change', function(e){ setCategoryUI(e.target.value); });
+    document.getElementById('ms-f-junior-age').addEventListener('change', refreshJuniorSkills);
+    document.addEventListener('keydown', function(e){
+      const ov = document.getElementById('ms-overlay');
+      if (e.key==='Escape' && ov && ov.classList.contains('open')) closeModal();
+    });
+  }
+
+  function refreshJuniorSkills(){
+    const ageEl = document.getElementById('ms-f-junior-age'); if (!ageEl) return;
+    const age = ageEl.value;
+    const skillEl = document.getElementById('ms-f-junior-skill'); if (!skillEl) return;
+    const prev = skillEl.value;
+    const opts = juniorSkillsFor(age);
+    skillEl.innerHTML = opts.map(function(s){ return '<option value="'+s+'">'+s+'</option>'; }).join('');
+    if (opts.indexOf(prev) !== -1) skillEl.value = prev;
+  }
+  function setCategoryUI(cat){
+    document.getElementById('ms-f-category').value = cat;
+    document.getElementById('ms-adult-row').style.display  = cat==='adult'  ? '' : 'none';
+    document.getElementById('ms-junior-row').style.display = cat==='junior' ? '' : 'none';
+  }
+
+  function renderTabs(){
+    const el = document.getElementById('ms-facility-tabs');
+    el.innerHTML = FACILITIES.map(function(f){ return '<button class="ms-tab '+(f.id===activeFacility?'active':'')+'" data-fac="'+f.id+'">'+f.name+'</button>'; }).join('');
+    el.querySelectorAll('.ms-tab').forEach(function(b){ b.onclick = function(){ activeFacility = b.dataset.fac; renderTabs(); renderPool(); renderGrid(); }; });
+  }
+  function renderDayTabs(){
+    const el = document.getElementById('ms-day-tabs');
+    el.innerHTML = DAYS.map(function(d,i){ return '<button class="ms-daytab '+(i===activeDay?'active':'')+'" data-day="'+i+'">'+d+'</button>'; }).join('');
+    el.querySelectorAll('.ms-daytab').forEach(function(b){ b.onclick = function(){ activeDay = +b.dataset.day; renderDayTabs(); renderPool(); renderGrid(); }; });
+  }
+
+  function morningCoachRowHTML(){
+    const r = getRosterDay();
+    let h = '<div class="ms-ghc label morning">Morning . '+MORNING_RANGE.label+'</div>';
+    for (let c = 0; c < COURT_COUNT; c++){
+      h += '<div class="ms-ghc"><input data-shift="morning" data-court="'+c+'" placeholder="Coach" value="'+esc(r.morning[c]||'')+'"></div>';
+    }
+    return h;
+  }
+  function eveningCoachCellHTML(c0){
+    const r = getRosterDay();
+    return '<div class="ms-ghc"><input data-shift="evening" data-court="'+c0+'" placeholder="Coach" value="'+esc(r.evening[c0]||'')+'"></div>';
+  }
+
+  function renderPool(){
+    const el = document.getElementById('ms-pool');
+    const p = (pools[activeFacility]||{})[activeDay] || { morning:[], evening:[] };
+    const r = getRosterDay();
+    const assigned = new Set();
+    [].concat(r.morning, r.evening).forEach(function(s){ if (s) s.split(/,\s*/).forEach(function(n){ assigned.add(n); }); });
+    function chips(list, shift){
+      if (!list.length) return '<span class="ms-pool-empty">No coaches on this shift</span>';
+      return list.map(function(n){ return '<span class="ms-chip '+(assigned.has(n)?'assigned':'')+'" draggable="true" data-shift="'+shift+'" data-name="'+esc(n)+'">'+esc(n)+'</span>'; }).join('');
+    }
+    el.innerHTML =
+      '<div class="ms-pool-row"><span class="ms-pool-label morning">Available morning</span>'+chips(p.morning,'morning')+'</div>' +
+      '<div class="ms-pool-row"><span class="ms-pool-label evening">Available evening</span>'+chips(p.evening,'evening')+'</div>';
+    el.querySelectorAll('.ms-chip').forEach(function(chip){
+      chip.addEventListener('dragstart', function(e){
+        e.dataTransfer.setData('text/coach-name', chip.dataset.name);
+        e.dataTransfer.setData('text/coach-shift', chip.dataset.shift);
+        e.dataTransfer.effectAllowed = 'copy';
+      });
+    });
+  }
+
+  function wireCoachInputs(g){
+    g.querySelectorAll('.ms-ghc input').forEach(function(inp){
+      inp.addEventListener('change', function(){
+        const r = getRosterDay();
+        r[inp.dataset.shift][+inp.dataset.court] = inp.value.trim();
+        persist(activeFacility); renderPool();
+      });
+    });
+    g.querySelectorAll('.ms-ghc').forEach(function(cell){
+      const inp = cell.querySelector('input'); if (!inp) return;
+      cell.addEventListener('dragover', function(e){
+        if (!Array.from(e.dataTransfer.types).indexOf('text/coach-shift') === -1) return;
+        e.preventDefault(); e.dataTransfer.dropEffect = 'copy';
+        cell.classList.add('drop-target');
+      });
+      cell.addEventListener('dragleave', function(){ cell.classList.remove('drop-target'); });
+      cell.addEventListener('drop', function(e){
+        e.preventDefault(); cell.classList.remove('drop-target');
+        const name = e.dataTransfer.getData('text/coach-name'); if (!name) return;
+        const existing = inp.value.trim();
+        if (!existing) inp.value = name;
+        else if (existing.split(/,\s*/).indexOf(name) === -1) inp.value = existing + ', ' + name;
+        const r = getRosterDay();
+        r[inp.dataset.shift][+inp.dataset.court] = inp.value.trim();
+        persist(activeFacility); renderPool();
+      });
+    });
+  }
+
+  function renderGrid(){
+    const g = document.getElementById('ms-grid');
+    let html = '<div class="ms-gh">Time</div>';
+    for (let i = 0; i < COURT_LABELS.length; i++){
+      const lbl = COURT_LABELS[i];
+      html += '<div class="ms-gh">'+(lbl==='W'?'Wall':'Court '+lbl)+'</div>';
+    }
+    html += morningCoachRowHTML();
+    html += '<div class="ms-tcol">';
+    for (let s = 0; s < TOTAL_SLOTS; s++){
+      if (s === FIRST_EVENING_SLOT) html += '<div class="ms-tlabel hour" style="font-weight:700;color:#2596b5;">Evening</div>';
+      const t = slotToTime(s); const isHour = t.indexOf(':00') !== -1 && t.endsWith(':00');
+      html += '<div class="ms-tlabel '+(isHour?'hour':'')+'">'+(isHour?fmt12(t):'')+'</div>';
+    }
+    html += '</div>';
+    for (let c = 1; c <= COURT_COUNT; c++){
+      html += '<div class="ms-ccol" data-court="'+c+'">';
+      for (let s = 0; s < TOTAL_SLOTS; s++){
+        if (s === FIRST_EVENING_SLOT) html += eveningCoachCellHTML(c-1);
+        const t = slotToTime(s); const isHour = t.endsWith(':00');
+        html += '<div class="ms-slot '+(isHour?'hour':'half')+'" data-slot="'+s+'"></div>';
+      }
+      if (activeDay <= 3) {
+        const top = slotToY(timeToSlot('09:30'));
+        const height = slotToY(timeToSlot('12:30')) - top;
+        const lbl = c===1 ? '<span class="ms-camp-lbl">SUMMER CAMP ZONE</span>' : '';
+        html += '<div class="ms-camp" style="top:'+top+'px;height:'+height+'px;">'+lbl+'</div>';
+      }
+      const gtop = slotToY(timeToSlot('14:00'));
+      const ght = 2 * SLOT_PX;
+      const glbl = c===1 ? '<span class="ms-gap-lbl">SHIFT CHANGE</span>' : '';
+      html += '<div class="ms-gap" style="top:'+gtop+'px;height:'+ght+'px;">'+glbl+'</div>';
+      const blocks = (msState[activeFacility].blocks||[]).filter(function(b){ return b.day===activeDay && Array.isArray(b.courts) && b.courts.indexOf(c) !== -1; });
+      for (let bi = 0; bi < blocks.length; bi++){
+        const b = blocks[bi];
+        const ss = timeToSlot(b.start), es = timeToSlot(b.end);
+        const top = slotToY(ss), height = slotToY(es) - top - 2;
+        const semCls = b.semester ? 'semester' : '';
+        const semBadge = b.semester ? '<span class="ms-sembadge">SEM</span>' : '';
+        const ct = b.courts.length > 1 ? ' . Cts ' + b.courts.map(function(x){ return COURT_LABELS[x-1]; }).join(',') : '';
+        html += '<div class="ms-block '+semCls+'" data-id="'+b.id+'" style="top:'+top+'px;height:'+height+'px;background:'+(b.color||'#2596b5')+';">'+semBadge+'<div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div></div>';
+      }
+      html += '</div>';
+    }
+    g.innerHTML = html;
+    wireCoachInputs(g);
+    g.querySelectorAll('.ms-ccol').forEach(function(col){
+      col.addEventListener('mousedown', onColMouseDown);
+      col.addEventListener('click', onColClick);
+    });
+  }
+
+  function slotFromEvent(colEl, e){
+    const rect = colEl.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const row = Math.floor(y / SLOT_PX);
+    if (row <= FIRST_EVENING_SLOT - 1) return Math.max(0, row);
+    if (row === FIRST_EVENING_SLOT) return FIRST_EVENING_SLOT;
+    return Math.min(TOTAL_SLOTS - 1, row - 1);
+  }
+  function onColClick(e){ const b = e.target.closest('.ms-block'); if (b) openEdit(b.dataset.id); }
+  function onColMouseDown(e){
+    if (e.button !== 0) return;
+    if (e.target.closest('.ms-block')) return;
+    if (e.target.closest('.ms-ghc')) return;
+    const colEl = e.currentTarget;
+    const court = +colEl.dataset.court;
+    const startSlot = slotFromEvent(colEl, e);
+    drag = { court: court, startSlot: startSlot, currentSlot: startSlot, colEl: colEl, previewEl: null };
+    const preview = document.createElement('div');
+    preview.className = 'ms-preview';
+    colEl.appendChild(preview);
+    drag.previewEl = preview;
+    updateDragPreview();
+    window.addEventListener('mousemove', onDragMove);
+    window.addEventListener('mouseup',   onDragEnd, { once: true });
+    e.preventDefault();
+  }
+  function onDragMove(e){ if (!drag) return; drag.currentSlot = slotFromEvent(drag.colEl, e); updateDragPreview(); }
+  function updateDragPreview(){
+    const a = Math.min(drag.startSlot, drag.currentSlot);
+    const b = Math.max(drag.startSlot, drag.currentSlot) + 1;
+    const top = slotToY(a), height = slotToY(b) - top - 2;
+    drag.previewEl.style.top = top+'px';
+    drag.previewEl.style.height = height+'px';
+    drag.previewEl.textContent = fmt12(slotToTime(a)) + ' - ' + fmt12(slotToTime(b));
+  }
+  function onDragEnd(){
+    window.removeEventListener('mousemove', onDragMove);
+    if (!drag) return;
+    const a = Math.min(drag.startSlot, drag.currentSlot);
+    const b = Math.max(drag.startSlot, drag.currentSlot) + 1;
+    const court = drag.court;
+    drag.previewEl.remove(); drag = null;
+    openCreate(activeDay, slotToTime(a), slotToTime(b), court);
+  }
+
+  function refreshSwatches(){
+    const el = document.getElementById('ms-f-colors');
+    el.innerHTML = COLORS.map(function(c){ return '<div class="ms-swatch '+(c===selectedColor?'selected':'')+'" data-color="'+c+'" style="background:'+c+'"></div>'; }).join('');
+    el.querySelectorAll('.ms-swatch').forEach(function(s){ s.onclick = function(){ selectedColor = s.dataset.color; refreshSwatches(); }; });
+  }
+  function refreshCourtChips(){
+    const el = document.getElementById('ms-f-courts');
+    el.innerHTML = COURT_LABELS.map(function(lbl,i){
+      const n = i+1, on = selectedCourts.indexOf(n) !== -1;
+      return '<div class="ms-court-chip '+(on?'on':'')+'" data-court="'+n+'">'+lbl+'</div>';
+    }).join('');
+    el.querySelectorAll('.ms-court-chip').forEach(function(b){
+      b.onclick = function(){
+        const n = +b.dataset.court;
+        if (selectedCourts.indexOf(n) !== -1) selectedCourts = selectedCourts.filter(function(x){ return x!==n; });
+        else selectedCourts.push(n);
+        if (!selectedCourts.length) selectedCourts = [n];
+        refreshCourtChips();
+      };
+    });
+  }
+
+  function openCreate(day, startTime, endTime, court){
+    editingId = null;
+    document.getElementById('ms-modal-title').textContent = 'Add class';
+    document.getElementById('ms-delete-btn').style.display = 'none';
+    document.getElementById('ms-f-notes').value = '';
+    document.getElementById('ms-f-day').value = day;
+    document.getElementById('ms-f-start').value = startTime;
+    document.getElementById('ms-f-end').value = endTime;
+    document.getElementById('ms-f-semester').checked = false;
+    setCategoryUI('adult');
+    document.getElementById('ms-f-adult-level').value = ADULT_LEVELS[0];
+    document.getElementById('ms-f-junior-age').value = JUNIOR_AGES[1];
+    refreshJuniorSkills();
+    selectedColor = COLORS[0];
+    selectedCourts = [court || 1];
+    refreshSwatches(); refreshCourtChips();
+    document.getElementById('ms-overlay').classList.add('open');
+  }
+  function openEdit(id){
+    const b = msState[activeFacility].blocks.find(function(x){ return x.id===id; }); if (!b) return;
+    editingId = id;
+    document.getElementById('ms-modal-title').textContent = 'Edit class';
+    document.getElementById('ms-delete-btn').style.display = '';
+    document.getElementById('ms-f-notes').value = b.notes || '';
+    document.getElementById('ms-f-day').value = b.day;
+    document.getElementById('ms-f-start').value = b.start;
+    document.getElementById('ms-f-end').value = b.end;
+    document.getElementById('ms-f-semester').checked = !!b.semester;
+    const cat = b.category || (b.juniorAge ? 'junior' : 'adult');
+    setCategoryUI(cat);
+    if (cat==='adult'){
+      const lv = ADULT_LEVELS.indexOf(b.adultLevel) !== -1 ? b.adultLevel : (ADULT_LEVELS.indexOf(b.level) !== -1 ? b.level : ADULT_LEVELS[0]);
+      document.getElementById('ms-f-adult-level').value = lv;
+    } else {
+      const ag = JUNIOR_AGES.indexOf(b.juniorAge) !== -1 ? b.juniorAge : JUNIOR_AGES[1];
+      document.getElementById('ms-f-junior-age').value = ag;
+      refreshJuniorSkills();
+      const skills = juniorSkillsFor(ag);
+      const sk = skills.indexOf(b.juniorSkill) !== -1 ? b.juniorSkill : skills[0];
+      document.getElementById('ms-f-junior-skill').value = sk;
+    }
+    selectedColor = b.color || COLORS[0];
+    selectedCourts = (Array.isArray(b.courts) && b.courts.length) ? b.courts.slice() : [1];
+    refreshSwatches(); refreshCourtChips();
+    document.getElementById('ms-overlay').classList.add('open');
+  }
+  function closeModal(){ const ov = document.getElementById('ms-overlay'); if (ov) ov.classList.remove('open'); editingId = null; }
+
+  function saveModal(){
+    const category = document.getElementById('ms-f-category').value;
+    const adultLevel = document.getElementById('ms-f-adult-level').value;
+    const juniorAge = document.getElementById('ms-f-junior-age').value;
+    const juniorSkill = document.getElementById('ms-f-junior-skill').value;
+    const level = composeLevel(category, adultLevel, juniorAge, juniorSkill);
+    const day = +document.getElementById('ms-f-day').value;
+    const start = document.getElementById('ms-f-start').value;
+    const end = document.getElementById('ms-f-end').value;
+    const notes = document.getElementById('ms-f-notes').value.trim();
+    const semester = document.getElementById('ms-f-semester').checked;
+    if (timeToSlot(end) <= timeToSlot(start)) { alert('End must be after start'); return; }
+    const courts = selectedCourts.slice().sort(function(a,b){ return a-b; });
+    const blocks = msState[activeFacility].blocks;
+    const extras = { category: category, adultLevel: category==='adult'?adultLevel:null, juniorAge: category==='junior'?juniorAge:null, juniorSkill: category==='junior'?juniorSkill:null };
+    if (editingId){
+      const b = blocks.find(function(x){ return x.id===editingId; });
+      Object.assign(b, { level: level, day: day, start: start, end: end, notes: notes, semester: semester, color: selectedColor, courts: courts }, extras);
+    } else {
+      const obj = Object.assign({ id: uid(), level: level, day: day, start: start, end: end, notes: notes, semester: semester, color: selectedColor, courts: courts }, extras);
+      blocks.push(obj);
+    }
+    if (day !== activeDay) activeDay = day;
+    persist(activeFacility);
+    closeModal();
+    renderDayTabs(); renderGrid();
+  }
+  function deleteBlock(){
+    if (!editingId) return;
+    if (!confirm('Delete this class?')) return;
+    msState[activeFacility].blocks = msState[activeFacility].blocks.filter(function(b){ return b.id !== editingId; });
+    persist(activeFacility);
+    closeModal();
+    renderGrid();
+  }
+
+  async function safeRun(label, fn){
+    try { await fn(); }
+    catch(e){
+      console.error('[Master Schedule] ' + label, e);
+      const el = document.getElementById('pane-master');
+      if (el) el.innerHTML = '<div style="padding:20px;color:#b00020;font-family:monospace;font-size:13px;"><b>Master Schedule error in ' + label + '</b><br><br>' + esc(e.message || String(e)) + '<br><br>Check console for full stack.</div>';
+    }
+  }
+
+  console.log('[Master Schedule] module loaded');
+  window.MS = {
+    async open(){
+      console.log('[Master Schedule] open(), initialized=', initialized);
+      await safeRun('open', async function(){
+        if (!initialized){
+          buildPane();
+          await bootstrapMS();
+          initialized = true;
+        } else {
+          try { const r = await fetch('/api/pool'); if (r.ok) pools = await r.json(); } catch(e){}
+        }
+        renderTabs(); renderDayTabs(); renderPool(); renderGrid();
+      });
+    }
+  };
 })();
 </script>
 </body>
