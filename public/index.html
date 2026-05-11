@@ -6,7 +6,7 @@
 <title>Coach Scheduler</title>
 <style>
 /* Master Schedule pane (scoped under #pane-master) */
-#pane-master { --ms-green:#95d600; --ms-navy:#1b4458; --ms-blue:#2596b5; --ms-plat:#F1F5F5; --ms-border:#d8e1e3; --ms-muted:#6b7c83; --ms-camp:rgba(149,214,0,0.10); padding:0 0 40px; user-select:none; }
+#pane-master { --ms-green:#95d600; --ms-navy:#1b4458; --ms-blue:#2596b5; --ms-plat:#F1F5F5; --ms-border:#d8e1e3; --ms-muted:#6b7c83; --ms-camp:rgba(149,214,0,0.05); --ms-camp-edge:rgba(27,68,88,0.35); padding:0 0 40px; user-select:none; }
 #pane-master .ms-bar { display:flex; gap:4px; padding:8px 0 0; }
 #pane-master .ms-tab { padding:8px 16px; border:1px solid transparent; border-bottom:none; border-radius:6px 6px 0 0; background:transparent; cursor:pointer; font-size:14px; color:var(--ms-muted); }
 #pane-master .ms-tab.active { background:var(--ms-plat); color:var(--ms-navy); border-color:var(--ms-border); font-weight:600; }
@@ -19,7 +19,7 @@
 #pane-master .ms-sample.sem { border:2px dashed var(--ms-navy); background:#fff; }
 #pane-master .ms-sample.reg { background:var(--ms-blue); }
 #pane-master .ms-sample.jr { background:#f57c00; }
-#pane-master .ms-sample.band { background:var(--ms-camp); border-top:2px dotted var(--ms-navy); border-bottom:2px dotted var(--ms-navy); }
+#pane-master .ms-sample.band { background:var(--ms-camp); border-top:2px dotted var(--ms-camp-edge); border-bottom:2px dotted var(--ms-camp-edge); }
 #pane-master button.ms-btn { padding:6px 12px; border:1px solid var(--ms-border); background:#fff; border-radius:5px; cursor:pointer; font-size:13px; }
 #pane-master button.ms-btn:hover { background:var(--ms-plat); }
 #pane-master button.ms-btn.primary { background:var(--ms-navy); color:#fff; border-color:var(--ms-navy); }
@@ -54,7 +54,7 @@
 #pane-master .ms-slot { border-top:1px solid var(--ms-border); }
 #pane-master .ms-slot.hour { border-top-color:#c2cdcf; }
 #pane-master .ms-slot.half { border-top-style:dashed; border-top-color:#ecf0f1; }
-#pane-master .ms-camp { position:absolute; left:0; right:0; background:var(--ms-camp); border-top:2px dotted var(--ms-navy); border-bottom:2px dotted var(--ms-navy); pointer-events:none; z-index:1; }
+#pane-master .ms-camp { position:absolute; left:0; right:0; background:var(--ms-camp); border-top:2px dotted var(--ms-camp-edge); border-bottom:2px dotted var(--ms-camp-edge); pointer-events:none; z-index:1; }
 #pane-master .ms-camp-lbl { position:absolute; bottom:2px; left:4px; font-size:9px; color:var(--ms-navy); font-weight:600; letter-spacing:0.5px; opacity:0.7; }
 #pane-master .ms-gap { position:absolute; left:0; right:0; background:repeating-linear-gradient(45deg, rgba(0,0,0,0.04), rgba(0,0,0,0.04) 6px, rgba(0,0,0,0.08) 6px, rgba(0,0,0,0.08) 12px); border-top:1px dashed var(--ms-muted); border-bottom:1px dashed var(--ms-muted); pointer-events:none; z-index:2; }
 #pane-master .ms-gap-lbl { position:absolute; bottom:1px; right:4px; font-size:9px; color:var(--ms-muted); letter-spacing:0.5px; }
