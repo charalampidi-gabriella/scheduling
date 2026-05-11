@@ -3155,7 +3155,8 @@ async function importLocalStorage() {
 
   let store = { satc:[], pharr:[], wilco:[] };
   let rosters = { satc:{}, pharr:{}, wilco:{} };
-  let filters = { days:new Set([0,1,2,3,4,5,6]), cat:'all', shift:'all', sem:'all', q:'' };
+  let filters = { days:new Set([0,1,2,3,4,5,6]), cat:'all', loc:'all', sem:'all', shift:'all', q:'' };
+  function facList(){ return filters.loc==='all' ? FACILITIES : FACILITIES.filter(function(f){ return f.id===filters.loc; }); }
 
   function esc(s){ return String(s).replace(/[&<>"']/g,function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
   function timeToMin(t){ const a=String(t||'0:0').split(':').map(Number); return (a[0]||0)*60+(a[1]||0); }
@@ -3255,13 +3256,19 @@ async function importLocalStorage() {
     const el = document.getElementById('t-filters'); if (!el) return;
     const dayChips = DAYS.map(function(d,i){ return chip('fday', i, d, filters.days.has(i)); }).join('') +
       '<span class="t-chip" data-fday="all">All</span><span class="t-chip" data-fday="wd">Mon-Fri</span><span class="t-chip" data-fday="we">Sat-Sun</span>';
+    const locChips = chip('floc','all','All',filters.loc==='all') + FACILITIES.map(function(f){ return chip('floc', f.id, f.name, filters.loc===f.id); }).join('');
     el.innerHTML =
+      '<div class="t-fgroup"><span class="t-flabel">Location</span><div class="t-chips">'+locChips+'</div></div>' +
       '<div class="t-fgroup"><span class="t-flabel">Category</span><div class="t-chips">'+
         chip('fcat','all','All',filters.cat==='all')+chip('fcat','adult','Adult',filters.cat==='adult')+chip('fcat','junior','Junior',filters.cat==='junior')+'</div></div>' +
+      '<div class="t-fgroup"><span class="t-flabel">Program</span><div class="t-chips">'+
+        chip('fsem','all','All',filters.sem==='all')+chip('fsem','sem','Semester',filters.sem==='sem')+chip('fsem','reg','Non-semester',filters.sem==='reg')+'</div></div>' +
       '<div class="t-fgroup"><span class="t-flabel">Days</span><div class="t-chips">'+dayChips+'</div></div>' +
-      '<div class="t-spacer"><button class="t-btn" id="t-refresh" title="Re-load from database">&#8635; Refresh</button></div>';
+      '<div class="t-spacer"><button class="t-btn" id="t-reset">Reset</button><button class="t-btn" id="t-refresh" title="Re-load from database">&#8635; Refresh</button></div>';
 
+    el.querySelectorAll('[data-floc]').forEach(function(c){ c.onclick=function(){ filters.loc=c.dataset.floc; renderFilters(); renderResults(); }; });
     el.querySelectorAll('[data-fcat]').forEach(function(c){ c.onclick=function(){ filters.cat=c.dataset.fcat; renderFilters(); renderResults(); }; });
+    el.querySelectorAll('[data-fsem]').forEach(function(c){ c.onclick=function(){ filters.sem=c.dataset.fsem; renderFilters(); renderResults(); }; });
     el.querySelectorAll('[data-fday]').forEach(function(c){ c.onclick = function(){
       const v = c.dataset.fday;
       if (v==='all') filters.days = new Set([0,1,2,3,4,5,6]);
@@ -3270,6 +3277,7 @@ async function importLocalStorage() {
       else { const i=+v; if (filters.days.has(i)) filters.days.delete(i); else filters.days.add(i); if (!filters.days.size) filters.days = new Set([0,1,2,3,4,5,6]); }
       renderFilters(); renderResults();
     }; });
+    const rs = document.getElementById('t-reset'); if (rs) rs.onclick = function(){ filters = { days:new Set([0,1,2,3,4,5,6]), cat:'all', loc:'all', sem:'all', shift:'all', q:'' }; renderFilters(); renderResults(); };
     const rf = document.getElementById('t-refresh'); if (rf) rf.onclick = async function(){ rf.disabled=true; await load(); rf.disabled=false; renderResults(); };
   }
 
@@ -3338,7 +3346,8 @@ async function importLocalStorage() {
 
   function levelTable(){
     const el = document.getElementById('t-bylevel'); if (!el) return;
-    const summ = FACILITIES.map(function(f){ return summarize(f.id); });
+    const facs = facList();
+    const summ = facs.map(function(f){ return summarize(f.id); });
     const levels = {};
     summ.forEach(function(s){ Object.keys(s.byLevel).forEach(function(l){ levels[l]=1; }); });
     const rows = Object.keys(levels).map(function(l){
@@ -3346,24 +3355,26 @@ async function importLocalStorage() {
       return { l:l, vals:vals, tot:vals.reduce(function(a,b){ return a+b; },0) };
     }).sort(function(a,b){ return b.tot-a.tot || a.l.localeCompare(b.l); });
     if (!rows.length){ el.innerHTML = '<div class="t-empty">No classes match the current filters.</div>'; return; }
-    const colTot = FACILITIES.map(function(f,i){ return rows.reduce(function(a,r){ return a+r.vals[i]; }, 0); });
+    const colTot = facs.map(function(f,i){ return rows.reduce(function(a,r){ return a+r.vals[i]; }, 0); });
     const grand = colTot.reduce(function(a,b){ return a+b; }, 0);
     el.innerHTML =
-      '<table class="t-table"><thead><tr><th>Level</th>'+FACILITIES.map(function(f){ return '<th>'+esc(f.name)+'</th>'; }).join('')+'<th>Total</th></tr></thead><tbody>' +
+      '<table class="t-table"><thead><tr><th>Level</th>'+facs.map(function(f){ return '<th>'+esc(f.name)+'</th>'; }).join('')+'<th>Total</th></tr></thead><tbody>' +
       rows.map(function(r){ return '<tr><td>'+esc(r.l)+'</td>'+r.vals.map(function(v){ return '<td>'+(v||'')+'</td>'; }).join('')+'<td><b>'+r.tot+'</b></td></tr>'; }).join('') +
       '</tbody><tfoot><tr class="total"><td>All levels</td>'+colTot.map(function(v){ return '<td>'+v+'</td>'; }).join('')+'<td>'+grand+'</td></tr></tfoot></table>';
   }
 
   function renderResults(){
-    const summ = FACILITIES.map(function(f){ return summarize(f.id); });
+    const facs = facList();
+    const summ = facs.map(function(f){ return summarize(f.id); });
     const allLevels = {};
     summ.forEach(function(s){ Object.keys(s.byLevel).forEach(function(l){ allLevels[l] = (allLevels[l]||0) + s.byLevel[l]; }); });
     const levelNames = Object.keys(allLevels);
     const totalClasses = levelNames.reduce(function(a,l){ return a + allLevels[l]; }, 0);
 
     const legEl = document.getElementById('t-legend');
-    if (legEl) legEl.innerHTML = FACILITIES.map(function(f){ return '<span><i style="background:'+f.color+'"></i>'+esc(f.name)+'</span>'; }).join('') +
-      '<span><b style="color:var(--t-navy)">'+totalClasses+'</b> classes &middot; <b style="color:var(--t-navy)">'+levelNames.length+'</b> levels</span>';
+    if (legEl) legEl.innerHTML = facs.map(function(f){ return '<span><i style="background:'+f.color+'"></i>'+esc(f.name)+'</span>'; }).join('') +
+      '<span><b style="color:var(--t-navy)">'+totalClasses+'</b> classes &middot; <b style="color:var(--t-navy)">'+levelNames.length+'</b> levels' +
+      (filters.sem==='sem' ? ' &middot; semester only' : filters.sem==='reg' ? ' &middot; non-semester only' : '') + '</span>';
 
     const lb = document.getElementById('t-levelbars');
     if (lb){
@@ -3373,7 +3384,7 @@ async function importLocalStorage() {
       else {
         const max = Math.max(1, rows[0].tot);
         lb.innerHTML = '<div class="t-bars">' + rows.map(function(r){
-          const segs = FACILITIES.map(function(f,fi){ const v = r.vals[fi]; if (!v) return ''; const w = v/max*100;
+          const segs = facs.map(function(f,fi){ const v = r.vals[fi]; if (!v) return ''; const w = v/max*100;
             return '<span class="t-bar" style="width:'+w+'%;background:'+f.color+'" title="'+esc(f.name)+': '+v+'">'+(w>10 ? v : '')+'</span>'; }).join('');
           return '<div class="t-barrow"><span title="'+esc(r.l)+'">'+esc(r.l)+'</span><div class="t-bartrack">'+segs+'<span class="t-bartot">'+r.tot+'</span></div></div>';
         }).join('') + '</div>';
