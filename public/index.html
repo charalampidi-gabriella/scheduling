@@ -18,6 +18,7 @@
 #pane-master .ms-sample { display:inline-block; width:18px; height:12px; border-radius:3px; vertical-align:middle; margin-right:5px; }
 #pane-master .ms-sample.sem { border:2px dashed var(--ms-navy); background:#fff; }
 #pane-master .ms-sample.reg { background:var(--ms-blue); }
+#pane-master .ms-sample.jr { background:#f57c00; }
 #pane-master .ms-sample.band { background:var(--ms-camp); border-top:2px dotted var(--ms-navy); border-bottom:2px dotted var(--ms-navy); }
 #pane-master button.ms-btn { padding:6px 12px; border:1px solid var(--ms-border); background:#fff; border-radius:5px; cursor:pointer; font-size:13px; }
 #pane-master button.ms-btn:hover { background:var(--ms-plat); }
@@ -121,7 +122,8 @@
 #pane-totals .t-section { margin-bottom:26px; }
 #pane-totals .t-section h3 { font-size:12px; text-transform:uppercase; letter-spacing:0.6px; color:var(--t-navy); margin:0 0 12px; }
 #pane-totals .t-bars { display:flex; flex-direction:column; gap:7px; }
-#pane-totals .t-barrow { display:grid; grid-template-columns:42px 1fr; gap:10px; align-items:center; font-size:12px; color:var(--t-navy); }
+#pane-totals .t-barrow { display:grid; grid-template-columns:180px 1fr; gap:10px; align-items:center; font-size:12px; color:var(--t-navy); }
+#pane-totals .t-barrow > span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 #pane-totals .t-bartrack { display:flex; align-items:center; gap:2px; }
 #pane-totals .t-bar { height:18px; border-radius:3px; min-width:2px; display:flex; align-items:center; padding:0 5px; color:#fff; font-size:10px; font-weight:700; white-space:nowrap; overflow:hidden; box-sizing:border-box; }
 #pane-totals .t-bartot { margin-left:7px; font-weight:700; color:var(--t-navy); }
@@ -2624,7 +2626,6 @@ async function importLocalStorage() {
   let msState = { satc:{blocks:[]}, pharr:{blocks:[]}, wilco:{blocks:[]} };
   let pools = { satc:{}, pharr:{}, wilco:{} };
   let editingId = null;
-  let selectedColor = COLORS[0];
   let selectedCourts = [1];
   let saveTimers = {};
   let drag = null;
@@ -2696,7 +2697,8 @@ async function importLocalStorage() {
         '<button class="ms-btn primary" id="ms-add-btn">+ Add class</button>' +
         '<button class="ms-btn" id="ms-export-btn">Export JSON</button>' +
         '<span class="ms-legend">' +
-          '<span><span class="ms-sample reg"></span>Regular</span>' +
+          '<span><span class="ms-sample reg"></span>Adult</span>' +
+          '<span><span class="ms-sample jr"></span>Junior</span>' +
           '<span><span class="ms-sample sem"></span>Semester</span>' +
           '<span><span class="ms-sample band"></span>Summer camp band (Mon-Thu 9:30-12:30)</span>' +
         '</span>' +
@@ -2720,7 +2722,6 @@ async function importLocalStorage() {
           '<label class="ms-field" style="margin-bottom:10px;">Courts<div id="ms-f-courts" class="ms-court-chips"></div></label>' +
           '<label class="ms-field">Notes<textarea id="ms-f-notes" rows="2"></textarea></label>' +
           '<div class="ms-row" style="align-items:flex-end;">' +
-            '<label class="ms-field">Color<div class="ms-swatches" id="ms-f-colors"></div></label>' +
             '<label class="ms-check"><input id="ms-f-semester" type="checkbox"> Semester class</label>' +
           '</div>' +
           '<div class="ms-actions">' +
@@ -2887,7 +2888,7 @@ async function importLocalStorage() {
         const semCls = b.semester ? 'semester' : '';
         const semBadge = b.semester ? '<span class="ms-sembadge">SEM</span>' : '';
         const ct = b.courts.length > 1 ? ' . Cts ' + b.courts.map(function(x){ return COURT_LABELS[x-1]; }).join(',') : '';
-        html += '<div class="ms-block '+semCls+'" data-id="'+b.id+'" style="top:'+top+'px;height:'+height+'px;background:'+(b.color||'#2596b5')+';">'+semBadge+'<div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div><div class="ms-resize"></div></div>';
+        html += '<div class="ms-block '+semCls+'" data-id="'+b.id+'" style="top:'+top+'px;height:'+height+'px;background:'+blockColor(b)+';">'+semBadge+'<div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div><div class="ms-resize"></div></div>';
       }
       html += '</div>';
     }
@@ -2998,11 +2999,8 @@ async function importLocalStorage() {
     openCreate(activeDay, slotToTime(a), slotToTime(b), court);
   }
 
-  function refreshSwatches(){
-    const el = document.getElementById('ms-f-colors');
-    el.innerHTML = COLORS.map(function(c){ return '<div class="ms-swatch '+(c===selectedColor?'selected':'')+'" data-color="'+c+'" style="background:'+c+'"></div>'; }).join('');
-    el.querySelectorAll('.ms-swatch').forEach(function(s){ s.onclick = function(){ selectedColor = s.dataset.color; refreshSwatches(); }; });
-  }
+  function catColor(cat){ return cat==='junior' ? '#f57c00' : '#2596b5'; }
+  function blockColor(b){ return catColor(b.category || (b.juniorAge ? 'junior' : 'adult')); }
   function refreshCourtChips(){
     const el = document.getElementById('ms-f-courts');
     el.innerHTML = COURT_LABELS.map(function(lbl,i){
@@ -3033,9 +3031,8 @@ async function importLocalStorage() {
     document.getElementById('ms-f-adult-level').value = ADULT_LEVELS[0];
     document.getElementById('ms-f-junior-age').value = JUNIOR_AGES[1];
     refreshJuniorSkills();
-    selectedColor = COLORS[0];
     selectedCourts = [court || 1];
-    refreshSwatches(); refreshCourtChips();
+    refreshCourtChips();
     document.getElementById('ms-overlay').classList.add('open');
   }
   function openEdit(id){
@@ -3061,9 +3058,8 @@ async function importLocalStorage() {
       const sk = skills.indexOf(b.juniorSkill) !== -1 ? b.juniorSkill : skills[0];
       document.getElementById('ms-f-junior-skill').value = sk;
     }
-    selectedColor = b.color || COLORS[0];
     selectedCourts = (Array.isArray(b.courts) && b.courts.length) ? b.courts.slice() : [1];
-    refreshSwatches(); refreshCourtChips();
+    refreshCourtChips();
     document.getElementById('ms-overlay').classList.add('open');
   }
   function closeModal(){ const ov = document.getElementById('ms-overlay'); if (ov) ov.classList.remove('open'); editingId = null; }
@@ -3085,9 +3081,9 @@ async function importLocalStorage() {
     const extras = { category: category, adultLevel: category==='adult'?adultLevel:null, juniorAge: category==='junior'?juniorAge:null, juniorSkill: category==='junior'?juniorSkill:null };
     if (editingId){
       const b = blocks.find(function(x){ return x.id===editingId; });
-      Object.assign(b, { level: level, day: day, start: start, end: end, notes: notes, semester: semester, color: selectedColor, courts: courts }, extras);
+      Object.assign(b, { level: level, day: day, start: start, end: end, notes: notes, semester: semester, color: catColor(category), courts: courts }, extras);
     } else {
-      const obj = Object.assign({ id: uid(), level: level, day: day, start: start, end: end, notes: notes, semester: semester, color: selectedColor, courts: courts }, extras);
+      const obj = Object.assign({ id: uid(), level: level, day: day, start: start, end: end, notes: notes, semester: semester, color: catColor(category), courts: courts }, extras);
       blocks.push(obj);
     }
     if (day !== activeDay) activeDay = day;
@@ -3244,12 +3240,9 @@ async function importLocalStorage() {
     if (!el){ const m = document.getElementById('main') || document.body; el = document.createElement('div'); el.id='pane-totals'; el.className='hidden'; m.appendChild(el); }
     el.innerHTML =
       '<div class="t-filters" id="t-filters"></div>' +
-      '<div class="t-cards" id="t-cards"></div>' +
       '<div class="t-legend" id="t-legend"></div>' +
-      '<div class="t-section"><h3>Classes per day</h3><div class="t-bars" id="t-byday"></div></div>' +
-      '<div class="t-section"><h3>Class hours per day</h3><div class="t-bars" id="t-bydayhrs"></div></div>' +
-      '<div class="t-section"><h3>Court hours used (this week, all selected days)</h3><div class="t-bars" id="t-bycourt"></div></div>' +
-      '<div class="t-section"><h3>Classes by level</h3><div id="t-bylevel"></div></div>';
+      '<div class="t-section"><h3>Classes by level</h3><div id="t-levelbars"></div></div>' +
+      '<div class="t-section"><h3>Detail by location</h3><div id="t-bylevel"></div></div>';
     return el;
   }
 
@@ -3257,33 +3250,23 @@ async function importLocalStorage() {
   function renderFilters(){
     const el = document.getElementById('t-filters'); if (!el) return;
     const dayChips = DAYS.map(function(d,i){ return chip('fday', i, d, filters.days.has(i)); }).join('') +
-      '<span class="t-chip" data-fday="all">All</span><span class="t-chip" data-fday="none">None</span><span class="t-chip" data-fday="wd">Mon-Fri</span><span class="t-chip" data-fday="we">Sat-Sun</span>';
+      '<span class="t-chip" data-fday="all">All</span><span class="t-chip" data-fday="wd">Mon-Fri</span><span class="t-chip" data-fday="we">Sat-Sun</span>';
     el.innerHTML =
-      '<div class="t-fgroup"><span class="t-flabel">Days</span><div class="t-chips">'+dayChips+'</div></div>' +
       '<div class="t-fgroup"><span class="t-flabel">Category</span><div class="t-chips">'+
         chip('fcat','all','All',filters.cat==='all')+chip('fcat','adult','Adult',filters.cat==='adult')+chip('fcat','junior','Junior',filters.cat==='junior')+'</div></div>' +
-      '<div class="t-fgroup"><span class="t-flabel">Shift</span><div class="t-chips">'+
-        chip('fshift','all','All',filters.shift==='all')+chip('fshift','morning','Morning',filters.shift==='morning')+chip('fshift','evening','Evening',filters.shift==='evening')+'</div></div>' +
-      '<div class="t-fgroup"><span class="t-flabel">Type</span><div class="t-chips">'+
-        chip('fsem','all','All',filters.sem==='all')+chip('fsem','sem','Semester',filters.sem==='sem')+chip('fsem','reg','Regular',filters.sem==='reg')+'</div></div>' +
-      '<div class="t-fgroup"><span class="t-flabel">Search level / notes</span><input id="t-q" class="t-btn" style="cursor:text;min-width:170px" placeholder="e.g. Jr, 3.5, Private" value="'+esc(filters.q)+'"></div>' +
-      '<div class="t-spacer"><button class="t-btn" id="t-refresh" title="Re-load from database">&#8635; Refresh</button><button class="t-btn" id="t-reset">Reset filters</button></div>';
+      '<div class="t-fgroup"><span class="t-flabel">Days</span><div class="t-chips">'+dayChips+'</div></div>' +
+      '<div class="t-spacer"><button class="t-btn" id="t-refresh" title="Re-load from database">&#8635; Refresh</button></div>';
 
+    el.querySelectorAll('[data-fcat]').forEach(function(c){ c.onclick=function(){ filters.cat=c.dataset.fcat; renderFilters(); renderResults(); }; });
     el.querySelectorAll('[data-fday]').forEach(function(c){ c.onclick = function(){
       const v = c.dataset.fday;
       if (v==='all') filters.days = new Set([0,1,2,3,4,5,6]);
-      else if (v==='none') filters.days = new Set();
       else if (v==='wd') filters.days = new Set([0,1,2,3,4]);
       else if (v==='we') filters.days = new Set([5,6]);
-      else { const i=+v; if (filters.days.has(i)) filters.days.delete(i); else filters.days.add(i); }
+      else { const i=+v; if (filters.days.has(i)) filters.days.delete(i); else filters.days.add(i); if (!filters.days.size) filters.days = new Set([0,1,2,3,4,5,6]); }
       renderFilters(); renderResults();
     }; });
-    el.querySelectorAll('[data-fcat]').forEach(function(c){ c.onclick=function(){ filters.cat=c.dataset.fcat; renderFilters(); renderResults(); }; });
-    el.querySelectorAll('[data-fshift]').forEach(function(c){ c.onclick=function(){ filters.shift=c.dataset.fshift; renderFilters(); renderResults(); }; });
-    el.querySelectorAll('[data-fsem]').forEach(function(c){ c.onclick=function(){ filters.sem=c.dataset.fsem; renderFilters(); renderResults(); }; });
-    const q = document.getElementById('t-q'); if (q) q.oninput = function(){ filters.q = q.value.trim(); renderResults(); };
     const rf = document.getElementById('t-refresh'); if (rf) rf.onclick = async function(){ rf.disabled=true; await load(); rf.disabled=false; renderResults(); };
-    const rs = document.getElementById('t-reset'); if (rs) rs.onclick = function(){ filters = { days:new Set([0,1,2,3,4,5,6]), cat:'all', shift:'all', sem:'all', q:'' }; renderFilters(); renderResults(); };
   }
 
   function locationCard(f, s, totalCount){
@@ -3368,16 +3351,30 @@ async function importLocalStorage() {
   }
 
   function renderResults(){
-    const summ = {}; FACILITIES.forEach(function(f){ summ[f.id] = summarize(f.id); });
-    const g = combine(FACILITIES.map(function(f){ return summ[f.id]; }));
-    const cardsEl = document.getElementById('t-cards');
-    if (cardsEl) cardsEl.innerHTML = FACILITIES.map(function(f){ return locationCard(f, summ[f.id], g.count); }).join('') + grandCard(g);
+    const summ = FACILITIES.map(function(f){ return summarize(f.id); });
+    const allLevels = {};
+    summ.forEach(function(s){ Object.keys(s.byLevel).forEach(function(l){ allLevels[l] = (allLevels[l]||0) + s.byLevel[l]; }); });
+    const levelNames = Object.keys(allLevels);
+    const totalClasses = levelNames.reduce(function(a,l){ return a + allLevels[l]; }, 0);
+
     const legEl = document.getElementById('t-legend');
     if (legEl) legEl.innerHTML = FACILITIES.map(function(f){ return '<span><i style="background:'+f.color+'"></i>'+esc(f.name)+'</span>'; }).join('') +
-      (g.count===0 ? '<span style="font-style:italic">No classes match the current filters</span>' : '<span>Showing <b style="color:var(--t-navy)">'+g.count+'</b> classes across <b style="color:var(--t-navy)">'+filters.days.size+'</b> day(s)</span>');
-    barSection('t-byday',     function(s,i){ return s.byDay[i]; },     DAYS);
-    barSection('t-bydayhrs',  function(s,i){ return s.byDayHrs[i]; },  DAYS);
-    barSection('t-bycourt',   function(s,i){ return s.courtUse[i]; },  COURT_LABELS.map(function(c){ return c==='W' ? 'Wall' : 'Ct '+c; }));
+      '<span><b style="color:var(--t-navy)">'+totalClasses+'</b> classes &middot; <b style="color:var(--t-navy)">'+levelNames.length+'</b> levels</span>';
+
+    const lb = document.getElementById('t-levelbars');
+    if (lb){
+      const rows = levelNames.map(function(l){ return { l:l, vals:summ.map(function(s){ return s.byLevel[l]||0; }), tot:allLevels[l] }; })
+        .sort(function(a,b){ return b.tot - a.tot || a.l.localeCompare(b.l); });
+      if (!rows.length){ lb.innerHTML = '<div class="t-empty">No classes match the current filters.</div>'; }
+      else {
+        const max = Math.max(1, rows[0].tot);
+        lb.innerHTML = '<div class="t-bars">' + rows.map(function(r){
+          const segs = FACILITIES.map(function(f,fi){ const v = r.vals[fi]; if (!v) return ''; const w = v/max*100;
+            return '<span class="t-bar" style="width:'+w+'%;background:'+f.color+'" title="'+esc(f.name)+': '+v+'">'+(w>10 ? v : '')+'</span>'; }).join('');
+          return '<div class="t-barrow"><span title="'+esc(r.l)+'">'+esc(r.l)+'</span><div class="t-bartrack">'+segs+'<span class="t-bartot">'+r.tot+'</span></div></div>';
+        }).join('') + '</div>';
+      }
+    }
     levelTable();
   }
 
