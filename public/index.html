@@ -2620,9 +2620,20 @@ async function importLocalStorage() {
     return r;
   }
 
+  function ensurePane(){
+    let el = document.getElementById('pane-master');
+    if (!el) {
+      const main = document.getElementById('main') || document.body;
+      el = document.createElement('div');
+      el.id = 'pane-master';
+      main.appendChild(el);
+      // start hidden; setTab will reveal it if active
+      el.classList.add('hidden');
+    }
+    return el;
+  }
   function buildPane(){
-    const el = document.getElementById('pane-master');
-    if (!el) return;
+    const el = ensurePane();
     el.innerHTML =
       '<div class="ms-bar" id="ms-facility-tabs"></div>' +
       '<div class="ms-daybar" id="ms-day-tabs"></div>' +
@@ -2998,13 +3009,18 @@ async function importLocalStorage() {
     async open(){
       console.log('[Master Schedule] open(), initialized=', initialized);
       await safeRun('open', async function(){
+        // Always rebuild the DOM scaffold (creates #pane-master if absent).
+        // Cheap, idempotent, and avoids stale-cache mismatches.
+        buildPane();
         if (!initialized){
-          buildPane();
           await bootstrapMS();
           initialized = true;
         } else {
           try { const r = await fetch('/api/pool'); if (r.ok) pools = await r.json(); } catch(e){}
         }
+        // Reveal pane if scheduling's setTab missed it (e.g. element didn't exist yet).
+        const p = document.getElementById('pane-master');
+        if (p) p.classList.remove('hidden');
         renderTabs(); renderDayTabs(); renderPool(); renderGrid();
       });
     }
