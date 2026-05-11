@@ -87,6 +87,51 @@
 .ms-overlay button.ms-btn { padding:6px 12px; border:1px solid #d8e1e3; background:#fff; border-radius:5px; cursor:pointer; font-size:13px; }
 .ms-overlay button.ms-btn.primary { background:#1b4458; color:#fff; border-color:#1b4458; }
 .ms-overlay button.ms-btn.danger { background:#fff; color:#b00020; border-color:#f2c7cd; }
+
+/* Totals dashboard (scoped under #pane-totals) */
+#pane-totals { --t-navy:#1b4458; --t-green:#95d600; --t-blue:#2596b5; --t-plat:#F1F5F5; --t-border:#d8e1e3; --t-muted:#6b7c83; padding:16px 0 56px; }
+#pane-totals .t-filters { display:flex; gap:20px; flex-wrap:wrap; align-items:flex-end; padding:12px 14px; background:var(--t-plat); border:1px solid var(--t-border); border-radius:8px; margin-bottom:16px; }
+#pane-totals .t-fgroup { display:flex; flex-direction:column; gap:6px; }
+#pane-totals .t-flabel { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--t-navy); }
+#pane-totals .t-chips { display:flex; gap:4px; flex-wrap:wrap; }
+#pane-totals .t-chip { padding:4px 10px; border:1px solid var(--t-border); background:#fff; border-radius:999px; font-size:12px; color:var(--t-muted); cursor:pointer; user-select:none; }
+#pane-totals .t-chip:hover { border-color:var(--t-navy); }
+#pane-totals .t-chip.on { background:var(--t-navy); color:#fff; border-color:var(--t-navy); font-weight:600; }
+#pane-totals .t-btn { padding:6px 12px; border:1px solid var(--t-border); background:#fff; border-radius:5px; cursor:pointer; font-size:13px; color:var(--t-navy); }
+#pane-totals .t-btn:hover { background:#fff; border-color:var(--t-navy); }
+#pane-totals .t-spacer { margin-left:auto; display:flex; gap:8px; align-items:flex-end; }
+#pane-totals .t-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin-bottom:8px; }
+#pane-totals .t-card { border:1px solid var(--t-border); border-radius:10px; overflow:hidden; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+#pane-totals .t-card.grand { border:2px solid var(--t-navy); }
+#pane-totals .t-card-head { padding:9px 14px; font-size:14px; font-weight:700; color:#fff; display:flex; justify-content:space-between; align-items:center; }
+#pane-totals .t-card-body { padding:12px 14px; }
+#pane-totals .t-bignum { font-size:30px; font-weight:800; color:var(--t-navy); line-height:1; }
+#pane-totals .t-bignum span { font-size:13px; font-weight:600; color:var(--t-muted); }
+#pane-totals .t-spark { display:flex; align-items:flex-end; gap:3px; height:26px; margin:9px 0 2px; }
+#pane-totals .t-spark i { flex:1; border-radius:2px 2px 0 0; display:block; min-height:2px; }
+#pane-totals .t-spark-lbl { display:flex; gap:3px; font-size:9px; color:var(--t-muted); margin-bottom:8px; }
+#pane-totals .t-spark-lbl span { flex:1; text-align:center; }
+#pane-totals .t-mini { height:8px; border-radius:4px; background:var(--t-plat); display:flex; overflow:hidden; margin:8px 0 2px; }
+#pane-totals .t-mini i { display:block; height:100%; }
+#pane-totals .t-mini-lbl { font-size:10px; color:var(--t-muted); display:flex; justify-content:space-between; margin-bottom:4px; }
+#pane-totals .t-stat { display:flex; justify-content:space-between; font-size:13px; padding:4px 0; border-top:1px solid var(--t-border); color:var(--t-navy); }
+#pane-totals .t-stat b { font-weight:700; }
+#pane-totals .t-legend { display:flex; gap:18px; font-size:12px; color:var(--t-muted); margin:14px 0 22px; flex-wrap:wrap; }
+#pane-totals .t-legend i { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:middle; margin-right:5px; }
+#pane-totals .t-section { margin-bottom:26px; }
+#pane-totals .t-section h3 { font-size:12px; text-transform:uppercase; letter-spacing:0.6px; color:var(--t-navy); margin:0 0 12px; }
+#pane-totals .t-bars { display:flex; flex-direction:column; gap:7px; }
+#pane-totals .t-barrow { display:grid; grid-template-columns:42px 1fr; gap:10px; align-items:center; font-size:12px; color:var(--t-navy); }
+#pane-totals .t-bartrack { display:flex; align-items:center; gap:2px; }
+#pane-totals .t-bar { height:18px; border-radius:3px; min-width:2px; display:flex; align-items:center; padding:0 5px; color:#fff; font-size:10px; font-weight:700; white-space:nowrap; overflow:hidden; box-sizing:border-box; }
+#pane-totals .t-bartot { margin-left:7px; font-weight:700; color:var(--t-navy); }
+#pane-totals table.t-table { width:100%; border-collapse:collapse; font-size:13px; }
+#pane-totals table.t-table th, #pane-totals table.t-table td { border:1px solid var(--t-border); padding:6px 10px; text-align:right; }
+#pane-totals table.t-table th:first-child, #pane-totals table.t-table td:first-child { text-align:left; }
+#pane-totals table.t-table thead th { background:var(--t-plat); color:var(--t-navy); }
+#pane-totals table.t-table tbody tr:hover { background:rgba(149,214,0,0.08); }
+#pane-totals table.t-table tfoot td, #pane-totals table.t-table tr.total td { font-weight:700; background:var(--t-plat); }
+#pane-totals .t-empty { color:var(--t-muted); font-style:italic; padding:24px; text-align:center; border:1px dashed var(--t-border); border-radius:8px; }
 </style>
 <style>
 :root {
@@ -546,6 +591,7 @@ tr.coach-locked > td.t-today { background: #fef9c3 !important; }
   <button class="tab-btn active" data-tab="overview" onclick="setTab('overview')">Overview</button>
   <button class="tab-btn"        data-tab="location" onclick="setTab('location')">By Location</button>
   <button class="tab-btn"        data-tab="master"   onclick="setTab('master')">Master Schedule</button>
+  <button class="tab-btn"        data-tab="totals"   onclick="setTab('totals')">Totals</button>
   <button class="tab-btn"        data-tab="coach"    onclick="setTab('coach')">Coach</button>
   <button class="tab-btn"        data-tab="requests" onclick="setTab('requests')" id="req-tab">Requests</button>
   <button class="tab-btn"        data-tab="config"   onclick="setTab('config')">Config</button>
@@ -558,6 +604,7 @@ tr.coach-locked > td.t-today { background: #fef9c3 !important; }
   <div id="pane-requests"  class="hidden"></div>
   <div id="pane-config"    class="hidden"></div>
   <div id="pane-master"    class="hidden"></div>
+  <div id="pane-totals"    class="hidden"></div>
 </div>
 
 <div id="modal-root"></div>
@@ -2463,13 +2510,16 @@ function bgClose(e)   { if (e.target.classList.contains('overlay')) closeModal()
 function setTab(tab) {
   activeTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
-  ['overview', 'location', 'coach', 'requests', 'config', 'master'].forEach(t => {
+  ['overview', 'location', 'coach', 'requests', 'config', 'master', 'totals'].forEach(t => {
     const el = document.getElementById(`pane-${t}`);
     if (el) el.classList.toggle('hidden', t !== tab);
   });
   if (tab === 'master') {
     if (window.MS) window.MS.open();
     else { const p = document.getElementById('pane-master'); if (p) p.innerHTML = '<div style="padding:20px;color:#b00020;font-family:monospace">Master Schedule module did not initialize. Open the browser console (F12) for errors.</div>'; }
+  } else if (tab === 'totals') {
+    if (window.TOT) window.TOT.open();
+    else { const p = document.getElementById('pane-totals'); if (p) p.innerHTML = '<div style="padding:20px;color:#b00020;font-family:monospace">Totals module did not initialize. Open the browser console (F12) for errors.</div>'; }
   } else {
     render();
   }
@@ -3082,6 +3132,268 @@ async function importLocalStorage() {
         if (p) p.classList.remove('hidden');
         renderTabs(); renderDayTabs(); renderPool(); renderGrid();
       });
+    }
+  };
+})();
+</script>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// Totals dashboard — exposes window.TOT = { open() }.
+// Reads the master_* keys from D1 and aggregates per location, with filters.
+// ════════════════════════════════════════════════════════════════════════════
+(function(){
+  const FACILITIES = [
+    { id:'satc',  name:'SATC',  key:'master_satc',  color:'#1b4458' },
+    { id:'pharr', name:'Pharr', key:'master_pharr', color:'#2596b5' },
+    { id:'wilco', name:'Wilco', key:'master_wilco', color:'#7c4dff' },
+  ];
+  const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const COURT_LABELS = ['1','2','3','4','5','W'];
+  const COURT_COUNT = 6, OPEN_HOUR = 6, CLOSE_HOUR = 22;
+  const WEEK_COURT_CAPACITY = COURT_COUNT * (CLOSE_HOUR - OPEN_HOUR) * 7; // court-hours/week
+
+  let store = { satc:[], pharr:[], wilco:[] };
+  let rosters = { satc:{}, pharr:{}, wilco:{} };
+  let filters = { days:new Set([0,1,2,3,4,5,6]), cat:'all', shift:'all', sem:'all', q:'' };
+
+  function esc(s){ return String(s).replace(/[&<>"']/g,function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function timeToMin(t){ const a=String(t||'0:0').split(':').map(Number); return (a[0]||0)*60+(a[1]||0); }
+  function hoursOf(b){ return Math.max(0, (timeToMin(b.end)-timeToMin(b.start))/60); }
+  function isMorning(b){ return timeToMin(b.start) < 14*60; }
+  function catOf(b){ return b.category || (b.juniorAge ? 'junior' : 'adult'); }
+  function r1(n){ return Math.round((n+Number.EPSILON)*10)/10; }
+  function pct(a,b){ return b ? Math.round(a/b*100) : 0; }
+
+  async function load(){
+    try {
+      const data = await fetch('/api/state', { cache:'no-store' }).then(function(r){ return r.json(); });
+      FACILITIES.forEach(function(f){
+        const v = data[f.key];
+        store[f.id] = (v && Array.isArray(v.blocks)) ? v.blocks : [];
+        rosters[f.id] = (v && v.roster && typeof v.roster==='object') ? v.roster : {};
+      });
+    } catch(e){ console.error('[Totals] load', e); }
+  }
+
+  function pass(b){
+    if (!filters.days.has(b.day)) return false;
+    if (filters.cat!=='all' && catOf(b)!==filters.cat) return false;
+    if (filters.shift==='morning' && !isMorning(b)) return false;
+    if (filters.shift==='evening' &&  isMorning(b)) return false;
+    if (filters.sem==='sem' && !b.semester) return false;
+    if (filters.sem==='reg' &&  b.semester) return false;
+    if (filters.q){
+      const hay = ((b.level||'')+' '+(b.notes||'')+' '+(b.adultLevel||'')+' '+(b.juniorAge||'')+' '+(b.juniorSkill||'')).toLowerCase();
+      if (hay.indexOf(filters.q.toLowerCase())===-1) return false;
+    }
+    return true;
+  }
+
+  function coachesFor(facId){
+    const set = new Set();
+    const ros = rosters[facId] || {};
+    Object.keys(ros).forEach(function(d){
+      if (!filters.days.has(+d)) return;
+      const r = ros[d] || {};
+      ['morning','evening'].forEach(function(sh){
+        if (filters.shift==='morning' && sh!=='morning') return;
+        if (filters.shift==='evening' && sh!=='evening') return;
+        (Array.isArray(r[sh]) ? r[sh] : []).forEach(function(cell){
+          String(cell||'').split(/,\s*/).forEach(function(n){ n=n.trim(); if (n) set.add(n); });
+        });
+      });
+    });
+    return set;
+  }
+
+  function summarize(facId){
+    const blocks = store[facId] || [];
+    const s = { count:0, classHrs:0, courtHrs:0, adult:0, junior:0, sem:0, morning:0, evening:0,
+                byDay:[0,0,0,0,0,0,0], byDayHrs:[0,0,0,0,0,0,0], byLevel:{}, courtUse:[0,0,0,0,0,0], coaches:0 };
+    blocks.forEach(function(b){
+      if (!pass(b)) return;
+      const h = hoursOf(b);
+      const courts = (Array.isArray(b.courts) && b.courts.length) ? b.courts : [1];
+      s.count++; s.classHrs += h; s.courtHrs += h*courts.length;
+      if (catOf(b)==='junior') s.junior++; else s.adult++;
+      if (b.semester) s.sem++;
+      if (isMorning(b)) s.morning++; else s.evening++;
+      if (b.day>=0 && b.day<=6){ s.byDay[b.day]++; s.byDayHrs[b.day] += h; }
+      const lv = b.level || '(no level)'; s.byLevel[lv] = (s.byLevel[lv]||0)+1;
+      courts.forEach(function(c){ if (c>=1 && c<=COURT_COUNT) s.courtUse[c-1] += h; });
+    });
+    s.coaches = coachesFor(facId).size;
+    return s;
+  }
+  function combine(list){
+    const g = { count:0, classHrs:0, courtHrs:0, adult:0, junior:0, sem:0, morning:0, evening:0,
+                byDay:[0,0,0,0,0,0,0], byDayHrs:[0,0,0,0,0,0,0], byLevel:{}, courtUse:[0,0,0,0,0,0], coaches:0 };
+    list.forEach(function(s){
+      g.count+=s.count; g.classHrs+=s.classHrs; g.courtHrs+=s.courtHrs; g.adult+=s.adult; g.junior+=s.junior;
+      g.sem+=s.sem; g.morning+=s.morning; g.evening+=s.evening; g.coaches+=s.coaches;
+      for (let i=0;i<7;i++){ g.byDay[i]+=s.byDay[i]; g.byDayHrs[i]+=s.byDayHrs[i]; }
+      for (let i=0;i<6;i++){ g.courtUse[i]+=s.courtUse[i]; }
+      Object.keys(s.byLevel).forEach(function(l){ g.byLevel[l]=(g.byLevel[l]||0)+s.byLevel[l]; });
+    });
+    return g;
+  }
+
+  function buildPane(){
+    let el = document.getElementById('pane-totals');
+    if (!el){ const m = document.getElementById('main') || document.body; el = document.createElement('div'); el.id='pane-totals'; el.className='hidden'; m.appendChild(el); }
+    el.innerHTML =
+      '<div class="t-filters" id="t-filters"></div>' +
+      '<div class="t-cards" id="t-cards"></div>' +
+      '<div class="t-legend" id="t-legend"></div>' +
+      '<div class="t-section"><h3>Classes per day</h3><div class="t-bars" id="t-byday"></div></div>' +
+      '<div class="t-section"><h3>Class hours per day</h3><div class="t-bars" id="t-bydayhrs"></div></div>' +
+      '<div class="t-section"><h3>Court hours used (this week, all selected days)</h3><div class="t-bars" id="t-bycourt"></div></div>' +
+      '<div class="t-section"><h3>Classes by level</h3><div id="t-bylevel"></div></div>';
+    return el;
+  }
+
+  function chip(attr, val, label, on){ return '<span class="t-chip '+(on?'on':'')+'" data-'+attr+'="'+val+'">'+label+'</span>'; }
+  function renderFilters(){
+    const el = document.getElementById('t-filters'); if (!el) return;
+    const dayChips = DAYS.map(function(d,i){ return chip('fday', i, d, filters.days.has(i)); }).join('') +
+      '<span class="t-chip" data-fday="all">All</span><span class="t-chip" data-fday="none">None</span><span class="t-chip" data-fday="wd">Mon-Fri</span><span class="t-chip" data-fday="we">Sat-Sun</span>';
+    el.innerHTML =
+      '<div class="t-fgroup"><span class="t-flabel">Days</span><div class="t-chips">'+dayChips+'</div></div>' +
+      '<div class="t-fgroup"><span class="t-flabel">Category</span><div class="t-chips">'+
+        chip('fcat','all','All',filters.cat==='all')+chip('fcat','adult','Adult',filters.cat==='adult')+chip('fcat','junior','Junior',filters.cat==='junior')+'</div></div>' +
+      '<div class="t-fgroup"><span class="t-flabel">Shift</span><div class="t-chips">'+
+        chip('fshift','all','All',filters.shift==='all')+chip('fshift','morning','Morning',filters.shift==='morning')+chip('fshift','evening','Evening',filters.shift==='evening')+'</div></div>' +
+      '<div class="t-fgroup"><span class="t-flabel">Type</span><div class="t-chips">'+
+        chip('fsem','all','All',filters.sem==='all')+chip('fsem','sem','Semester',filters.sem==='sem')+chip('fsem','reg','Regular',filters.sem==='reg')+'</div></div>' +
+      '<div class="t-fgroup"><span class="t-flabel">Search level / notes</span><input id="t-q" class="t-btn" style="cursor:text;min-width:170px" placeholder="e.g. Jr, 3.5, Private" value="'+esc(filters.q)+'"></div>' +
+      '<div class="t-spacer"><button class="t-btn" id="t-refresh" title="Re-load from database">&#8635; Refresh</button><button class="t-btn" id="t-reset">Reset filters</button></div>';
+
+    el.querySelectorAll('[data-fday]').forEach(function(c){ c.onclick = function(){
+      const v = c.dataset.fday;
+      if (v==='all') filters.days = new Set([0,1,2,3,4,5,6]);
+      else if (v==='none') filters.days = new Set();
+      else if (v==='wd') filters.days = new Set([0,1,2,3,4]);
+      else if (v==='we') filters.days = new Set([5,6]);
+      else { const i=+v; if (filters.days.has(i)) filters.days.delete(i); else filters.days.add(i); }
+      renderFilters(); renderResults();
+    }; });
+    el.querySelectorAll('[data-fcat]').forEach(function(c){ c.onclick=function(){ filters.cat=c.dataset.fcat; renderFilters(); renderResults(); }; });
+    el.querySelectorAll('[data-fshift]').forEach(function(c){ c.onclick=function(){ filters.shift=c.dataset.fshift; renderFilters(); renderResults(); }; });
+    el.querySelectorAll('[data-fsem]').forEach(function(c){ c.onclick=function(){ filters.sem=c.dataset.fsem; renderFilters(); renderResults(); }; });
+    const q = document.getElementById('t-q'); if (q) q.oninput = function(){ filters.q = q.value.trim(); renderResults(); };
+    const rf = document.getElementById('t-refresh'); if (rf) rf.onclick = async function(){ rf.disabled=true; await load(); rf.disabled=false; renderResults(); };
+    const rs = document.getElementById('t-reset'); if (rs) rs.onclick = function(){ filters = { days:new Set([0,1,2,3,4,5,6]), cat:'all', shift:'all', sem:'all', q:'' }; renderFilters(); renderResults(); };
+  }
+
+  function locationCard(f, s, totalCount){
+    const adultPct = pct(s.adult, s.count);
+    const maxDay = Math.max(1, Math.max.apply(null, s.byDay));
+    const busiestIdx = s.byDay.reduce(function(best,v,i){ return v>s.byDay[best] ? i : best; }, 0);
+    const busiest = s.count ? DAYS[busiestIdx]+' ('+s.byDay[busiestIdx]+')' : '—';
+    const util = pct(s.courtHrs, WEEK_COURT_CAPACITY);
+    const spark = s.byDay.map(function(v){ const h = Math.round(v/maxDay*24); return '<i style="height:'+Math.max(2,h)+'px;background:'+f.color+';opacity:'+(v?1:0.2)+'"></i>'; }).join('');
+    return '<div class="t-card">' +
+      '<div class="t-card-head" style="background:'+f.color+'">'+esc(f.name)+'<span style="font-size:12px;font-weight:600;opacity:0.85">'+pct(s.count,totalCount)+'% of all</span></div>' +
+      '<div class="t-card-body">' +
+        '<div class="t-bignum">'+s.count+' <span>classes</span></div>' +
+        '<div class="t-spark">'+spark+'</div><div class="t-spark-lbl"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>' +
+        '<div class="t-mini-lbl"><span>Adult '+s.adult+'</span><span>Junior '+s.junior+'</span></div>' +
+        '<div class="t-mini"><i style="width:'+adultPct+'%;background:'+f.color+'"></i><i style="width:'+(100-adultPct)+'%;background:#cbd5d8"></i></div>' +
+        '<div class="t-stat"><span>Class hours / wk</span><b>'+r1(s.classHrs)+'</b></div>' +
+        '<div class="t-stat"><span>Court-hours / wk</span><b>'+r1(s.courtHrs)+'</b></div>' +
+        '<div class="t-stat"><span>Court utilization</span><b>'+util+'%</b></div>' +
+        '<div class="t-stat"><span>Morning / Evening</span><b>'+s.morning+' / '+s.evening+'</b></div>' +
+        '<div class="t-stat"><span>Semester classes</span><b>'+s.sem+'</b></div>' +
+        '<div class="t-stat"><span>Coaches rostered</span><b>'+s.coaches+'</b></div>' +
+        '<div class="t-stat"><span>Busiest day</span><b>'+busiest+'</b></div>' +
+      '</div></div>';
+  }
+  function grandCard(g){
+    const adultPct = pct(g.adult, g.count);
+    const levels = Object.keys(g.byLevel).length;
+    const cap = WEEK_COURT_CAPACITY * FACILITIES.length;
+    return '<div class="t-card grand">' +
+      '<div class="t-card-head" style="background:linear-gradient(135deg,#1b4458,#2596b5)">All locations</div>' +
+      '<div class="t-card-body">' +
+        '<div class="t-bignum">'+g.count+' <span>classes</span></div>' +
+        '<div class="t-mini-lbl"><span>Adult '+g.adult+'</span><span>Junior '+g.junior+'</span></div>' +
+        '<div class="t-mini"><i style="width:'+adultPct+'%;background:#1b4458"></i><i style="width:'+(100-adultPct)+'%;background:#cbd5d8"></i></div>' +
+        '<div class="t-stat"><span>Class hours / wk</span><b>'+r1(g.classHrs)+'</b></div>' +
+        '<div class="t-stat"><span>Court-hours / wk</span><b>'+r1(g.courtHrs)+'</b></div>' +
+        '<div class="t-stat"><span>Avg court utilization</span><b>'+pct(g.courtHrs, cap)+'%</b></div>' +
+        '<div class="t-stat"><span>Morning / Evening</span><b>'+g.morning+' / '+g.evening+'</b></div>' +
+        '<div class="t-stat"><span>Semester classes</span><b>'+g.sem+'</b></div>' +
+        '<div class="t-stat"><span>Distinct levels</span><b>'+levels+'</b></div>' +
+        '<div class="t-stat"><span>Coach slots / wk</span><b>'+g.coaches+'</b></div>' +
+      '</div></div>';
+  }
+
+  function barSection(elId, getVal, labels){
+    const el = document.getElementById(elId); if (!el) return;
+    const summ = FACILITIES.map(function(f){ return { f:f, s:summarize(f.id) }; });
+    const n = labels.length;
+    const rowTotals = [];
+    for (let i=0;i<n;i++){ rowTotals[i] = summ.reduce(function(a,x){ return a + getVal(x.s, i); }, 0); }
+    const max = Math.max(1, Math.max.apply(null, rowTotals));
+    let any = false;
+    const rows = labels.map(function(lab,i){
+      const segs = summ.map(function(x){
+        const v = getVal(x.s, i); if (!v) return '';
+        any = true;
+        const w = v/max*100;
+        return '<span class="t-bar" style="width:'+w+'%;background:'+x.f.color+'" title="'+esc(x.f.name)+': '+r1(v)+'">'+(w>9 ? r1(v) : '')+'</span>';
+      }).join('');
+      return '<div class="t-barrow"><span>'+esc(lab)+'</span><div class="t-bartrack">'+(segs || '<span style="color:var(--t-muted)">—</span>')+'<span class="t-bartot">'+r1(rowTotals[i])+'</span></div></div>';
+    }).join('');
+    el.innerHTML = any ? rows : '<div class="t-empty">Nothing matches the current filters.</div>';
+  }
+
+  function levelTable(){
+    const el = document.getElementById('t-bylevel'); if (!el) return;
+    const summ = FACILITIES.map(function(f){ return summarize(f.id); });
+    const levels = {};
+    summ.forEach(function(s){ Object.keys(s.byLevel).forEach(function(l){ levels[l]=1; }); });
+    const rows = Object.keys(levels).map(function(l){
+      const vals = summ.map(function(s){ return s.byLevel[l]||0; });
+      return { l:l, vals:vals, tot:vals.reduce(function(a,b){ return a+b; },0) };
+    }).sort(function(a,b){ return b.tot-a.tot || a.l.localeCompare(b.l); });
+    if (!rows.length){ el.innerHTML = '<div class="t-empty">No classes match the current filters.</div>'; return; }
+    const colTot = FACILITIES.map(function(f,i){ return rows.reduce(function(a,r){ return a+r.vals[i]; }, 0); });
+    const grand = colTot.reduce(function(a,b){ return a+b; }, 0);
+    el.innerHTML =
+      '<table class="t-table"><thead><tr><th>Level</th>'+FACILITIES.map(function(f){ return '<th>'+esc(f.name)+'</th>'; }).join('')+'<th>Total</th></tr></thead><tbody>' +
+      rows.map(function(r){ return '<tr><td>'+esc(r.l)+'</td>'+r.vals.map(function(v){ return '<td>'+(v||'')+'</td>'; }).join('')+'<td><b>'+r.tot+'</b></td></tr>'; }).join('') +
+      '</tbody><tfoot><tr class="total"><td>All levels</td>'+colTot.map(function(v){ return '<td>'+v+'</td>'; }).join('')+'<td>'+grand+'</td></tr></tfoot></table>';
+  }
+
+  function renderResults(){
+    const summ = {}; FACILITIES.forEach(function(f){ summ[f.id] = summarize(f.id); });
+    const g = combine(FACILITIES.map(function(f){ return summ[f.id]; }));
+    const cardsEl = document.getElementById('t-cards');
+    if (cardsEl) cardsEl.innerHTML = FACILITIES.map(function(f){ return locationCard(f, summ[f.id], g.count); }).join('') + grandCard(g);
+    const legEl = document.getElementById('t-legend');
+    if (legEl) legEl.innerHTML = FACILITIES.map(function(f){ return '<span><i style="background:'+f.color+'"></i>'+esc(f.name)+'</span>'; }).join('') +
+      (g.count===0 ? '<span style="font-style:italic">No classes match the current filters</span>' : '<span>Showing <b style="color:var(--t-navy)">'+g.count+'</b> classes across <b style="color:var(--t-navy)">'+filters.days.size+'</b> day(s)</span>');
+    barSection('t-byday',     function(s,i){ return s.byDay[i]; },     DAYS);
+    barSection('t-bydayhrs',  function(s,i){ return s.byDayHrs[i]; },  DAYS);
+    barSection('t-bycourt',   function(s,i){ return s.courtUse[i]; },  COURT_LABELS.map(function(c){ return c==='W' ? 'Wall' : 'Ct '+c; }));
+    levelTable();
+  }
+
+  console.log('[Totals] module loaded');
+  window.TOT = {
+    async open(){
+      try {
+        buildPane();
+        await load();
+        const p = document.getElementById('pane-totals'); if (p) p.classList.remove('hidden');
+        renderFilters(); renderResults();
+      } catch(e){
+        console.error('[Totals] open', e);
+        const el = document.getElementById('pane-totals');
+        if (el) el.innerHTML = '<div style="padding:20px;color:#b00020;font-family:monospace;font-size:13px"><b>Totals error</b><br><br>'+esc(e.message||String(e))+'</div>';
+      }
     }
   };
 })();
