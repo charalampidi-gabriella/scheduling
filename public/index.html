@@ -1434,8 +1434,12 @@ function saveMoves() {
     ss(m.fromCoachId, m.dayIdx, fromSched);
     const toSched = { ...gs(m.toCoachId, m.dayIdx) };
     toSched[m.shift] = m.loc;
-    // Persist the *original* origin so chained moves keep showing the source coach
-    toSched[m.shift + 'From'] = m.originFrom || m.fromName;
+    // Persist the *original* origin so chained moves keep showing the source
+    // coach — but not when a shift was moved back to the coach it came from.
+    const fromName = m.originFrom || m.fromName;
+    const toName = (COACHES.find(c => c.id === m.toCoachId) || {}).name;
+    if (fromName && fromName !== toName) toSched[m.shift + 'From'] = fromName;
+    else delete toSched[m.shift + 'From'];
     delete toSched[m.shift + 'New']; // moved-in is not "new", it's "from X"
     ss(m.toCoachId, m.dayIdx, toSched);
   });
@@ -1467,7 +1471,10 @@ function previewSched(coachId, dayIdx) {
     }
     if (m.toCoachId === coachId && m.dayIdx === dayIdx) {
       s[m.shift] = m.loc;
-      s[m.shift + 'From'] = m.originFrom || m.fromName;
+      const fromName = m.originFrom || m.fromName;
+      const myName = (COACHES.find(c => c.id === coachId) || {}).name;
+      if (fromName && fromName !== myName) s[m.shift + 'From'] = fromName;
+      else delete s[m.shift + 'From'];
     }
   });
   pendingAdds.forEach(a => {
@@ -1691,7 +1698,7 @@ function renderOverview() {
             onclick="event.stopPropagation();pickShift(${c.id},${i},'morning')">
             <span class="sloc">${LOCS[s.morning].name}</span>Morning${mLocked ? ' 🔒' : ''}
           </span>
-          ${movedM ? `<div class="from-tag">\u2190 from ${movedM.originFrom || movedM.fromName}</div>` : ''}
+          ${movedM && (movedM.originFrom || movedM.fromName) !== c.name ? `<div class="from-tag">\u2190 from ${movedM.originFrom || movedM.fromName}</div>` : ''}
           ${s.morningNew && !addedM ? `<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>` : ''}
         </div>` : '';
         const eBadge = s.evening ? `<div>
@@ -1700,7 +1707,7 @@ function renderOverview() {
             onclick="event.stopPropagation();pickShift(${c.id},${i},'evening')">
             <span class="sloc">${LOCS[s.evening].name}</span>Evening${eLocked ? ' 🔒' : ''}
           </span>
-          ${movedE ? `<div class="from-tag">\u2190 from ${movedE.originFrom || movedE.fromName}</div>` : ''}
+          ${movedE && (movedE.originFrom || movedE.fromName) !== c.name ? `<div class="from-tag">\u2190 from ${movedE.originFrom || movedE.fromName}</div>` : ''}
           ${s.eveningNew && !addedE ? `<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>` : ''}
         </div>` : '';
 
@@ -1730,8 +1737,8 @@ function renderOverview() {
         const editable = !locked && !isReadOnly();
         return `<td class="day-col" onclick="${editable ? `openModal(${c.id}, ${i})` : ''}" style="${editable?'':'cursor:default'}">
           <div class="cell-inner">
-            ${s.morning ? `<div><div class="shift-lock-wrap">${badge('morning', s.morning, mLocked)}${!locked ? `<span class="shift-lock-icon ${mLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'morning')">${mLocked?'🔒':'🔒'}</span>` : ''}</div>${s.morningFrom?`<div class="from-tag">← from ${s.morningFrom}</div>`:''}${s.morningNew?`<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>`:''}</div>` : ''}
-            ${s.evening ? `<div><div class="shift-lock-wrap">${badge('evening', s.evening, eLocked)}${!locked ? `<span class="shift-lock-icon ${eLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'evening')">${eLocked?'🔒':'🔒'}</span>` : ''}</div>${s.eveningFrom?`<div class="from-tag">← from ${s.eveningFrom}</div>`:''}${s.eveningNew?`<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>`:''}</div>` : ''}
+            ${s.morning ? `<div><div class="shift-lock-wrap">${badge('morning', s.morning, mLocked)}${!locked ? `<span class="shift-lock-icon ${mLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'morning')">${mLocked?'🔒':'🔒'}</span>` : ''}</div>${s.morningFrom && s.morningFrom !== c.name?`<div class="from-tag">← from ${s.morningFrom}</div>`:''}${s.morningNew?`<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>`:''}</div>` : ''}
+            ${s.evening ? `<div><div class="shift-lock-wrap">${badge('evening', s.evening, eLocked)}${!locked ? `<span class="shift-lock-icon ${eLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'evening')">${eLocked?'🔒':'🔒'}</span>` : ''}</div>${s.eveningFrom && s.eveningFrom !== c.name?`<div class="from-tag">← from ${s.eveningFrom}</div>`:''}${s.eveningNew?`<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>`:''}</div>` : ''}
             ${!s.morning && !s.evening ? `<span class="cell-empty">\u2014</span>` : ''}
           </div>
           ${editable ? '<div class="cell-add">+ add</div>' : ''}
@@ -1869,12 +1876,12 @@ function renderCoach() {
       <div class="wr-day-name">${day}</div>
       <div class="wr-shift">
         ${s.morning ? badge('morning', s.morning) : '<span class="no-shift-lbl">No morning shift</span>'}
-        ${s.morningFrom ? `<div class="from-tag">← from ${s.morningFrom}</div>` : ''}
+        ${s.morningFrom && s.morningFrom !== coach.name ? `<div class="from-tag">← from ${s.morningFrom}</div>` : ''}
         ${s.morningNew ? `<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>` : ''}
       </div>
       <div class="wr-shift">
         ${s.evening ? badge('evening', s.evening) : '<span class="no-shift-lbl">No evening shift</span>'}
-        ${s.eveningFrom ? `<div class="from-tag">← from ${s.eveningFrom}</div>` : ''}
+        ${s.eveningFrom && s.eveningFrom !== coach.name ? `<div class="from-tag">← from ${s.eveningFrom}</div>` : ''}
         ${s.eveningNew ? `<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>` : ''}
       </div>
       <button class="wr-edit-btn" onclick="openModal(${coach.id}, ${i})">Edit</button>
