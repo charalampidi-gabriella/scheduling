@@ -1148,10 +1148,50 @@ function resetDraftToCurrent() {
 function promoteDraftToCurrent() {
   const d = activeDraft(); if (!d) return;
   if (!confirm(`Promote "${d.name}" to Current? This overwrites the current schedule.`)) return;
+  syncMasterRoster(currentSched, d.schedule);
   currentSched = JSON.parse(JSON.stringify(d.schedule));
   persistCurrent();
   bindActiveSched();
   render();
+}
+
+// When a draft is promoted to Current, propagate coach reassignments into the
+// Master Schedule's per-court "Coach" boxes: for every facility/day/shift where
+// a coach was swapped out for another, rename the outgoing coach to the
+// incoming one wherever the name appears. (Rename-in-place only — brand-new
+// or removed shifts don't touch the boxes; they already drive the draggable
+// "Available" coach pool.)
+function syncMasterRoster(before, after) {
+  if (!window.MS || !window.MS.syncRoster) return;
+  const FACS = ['satc', 'pharr', 'wilco'];
+  const SHIFTS = ['morning', 'evening'];
+  const nameById = {};
+  COACHES.forEach(c => { nameById[c.id] = c.name; });
+  function coachesAt(sched, fac, day, shift) {
+    const out = [];
+    for (const k in sched) {
+      const us = k.indexOf('_'); if (us < 0) continue;
+      const cid = +k.slice(0, us), kday = +k.slice(us + 1);
+      if (kday !== day) continue;
+      const v = sched[k]; if (!v || v[shift] !== fac) continue;
+      const nm = nameById[cid]; if (nm) out.push(nm);
+    }
+    return out;
+  }
+  const changes = [];
+  for (let day = 0; day < 7; day++) {
+    for (const shift of SHIFTS) {
+      for (const fac of FACS) {
+        const b = coachesAt(before, fac, day, shift);
+        const a = coachesAt(after,  fac, day, shift);
+        const removed = b.filter(n => !a.includes(n));
+        const added   = a.filter(n => !b.includes(n));
+        const n = Math.min(removed.length, added.length);
+        for (let i = 0; i < n; i++) changes.push({ fac, day, shift, from: removed[i], to: added[i] });
+      }
+    }
+  }
+  if (changes.length) window.MS.syncRoster(changes);
 }
 
 function duplicateDraft() {
@@ -3177,6 +3217,37 @@ async function importLocalStorage() {
         if (p) p.classList.remove('hidden');
         renderTabs(); renderDayTabs(); renderPool(); renderGrid();
       });
+    },
+    // Called by the Overview when a draft is promoted to Current.
+    // changes: [{ fac, day, shift, from, to }] — rename coach `from` -> `to`
+    // in the per-court Coach boxes for that facility/day/shift.
+    async syncRoster(changes){
+      if (!Array.isArray(changes) || !changes.length) return;
+      try {
+        if (!initialized){ await bootstrapMS(); initialized = true; }
+        const touched = {};
+        changes.forEach(function(ch){
+          const fac = msState[ch.fac]; if (!fac || !fac.roster) return;
+          const r = fac.roster[ch.day];
+          if (!r || !Array.isArray(r[ch.shift])) return;
+          const arr = r[ch.shift];
+          for (let i = 0; i < arr.length; i++){
+            if (!arr[i]) continue;
+            const parts = arr[i].split(/,\s*/);
+            let hit = false;
+            for (let j = 0; j < parts.length; j++){ if (parts[j] === ch.from){ parts[j] = ch.to; hit = true; } }
+            if (hit){
+              const seen = [];
+              parts.forEach(function(p){ if (p && seen.indexOf(p) === -1) seen.push(p); });
+              arr[i] = seen.join(', ');
+              touched[ch.fac] = true;
+            }
+          }
+        });
+        const facIds = Object.keys(touched);
+        facIds.forEach(function(f){ persist(f); });
+        if (facIds.length && document.getElementById('ms-grid')){ renderPool(); renderGrid(); }
+      } catch(e){ console.error('[Master Schedule] syncRoster', e); }
     }
   };
 })();
