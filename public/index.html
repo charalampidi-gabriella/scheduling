@@ -149,6 +149,16 @@
 #pane-totals .t-jrdup-x { display:inline-block; background:#dc2626; color:#fff; border-radius:4px; padding:0 5px; font-size:11px; font-weight:700; margin-left:4px; vertical-align:middle; }
 #pane-totals .t-jrdup-chips { display:flex; gap:6px; flex-wrap:wrap; }
 #pane-totals .t-jrdup-chip { border:1px solid var(--t-border); border-left-width:3px; border-radius:4px; padding:2px 8px; font-size:12px; color:var(--t-muted); background:#fff; white-space:nowrap; }
+#pane-totals .t-lvl .t-barrow { cursor:pointer; border-radius:4px; }
+#pane-totals .t-lvl .t-barrow:hover { background:rgba(149,214,0,0.10); }
+#pane-totals .t-lvl-arrow { display:inline-block; font-size:9px; color:var(--t-muted); margin-right:5px; transition:transform .12s; }
+#pane-totals .t-lvl.open .t-lvl-arrow { transform:rotate(90deg); }
+#pane-totals .t-lvl-detail { display:none; padding:4px 0 10px 190px; }
+#pane-totals .t-lvl.open .t-lvl-detail { display:block; }
+#pane-totals .t-lvl-day { display:flex; gap:8px; align-items:baseline; padding:3px 0; font-size:12px; }
+#pane-totals .t-lvl-dayname { font-weight:700; color:var(--t-navy); min-width:34px; }
+#pane-totals .t-lvl-chips { display:flex; gap:6px; flex-wrap:wrap; }
+#pane-totals .t-lvl-chip { border:1px solid var(--t-border); border-left-width:3px; border-radius:4px; padding:1px 7px; color:var(--t-muted); background:#fff; white-space:nowrap; }
 </style>
 <style>
 :root {
@@ -3499,6 +3509,31 @@ async function importLocalStorage() {
       '</tbody><tfoot><tr class="total"><td>All levels</td>'+colTot.map(function(v){ return '<td>'+v+'</td>'; }).join('')+'<td>'+grand+'</td></tr></tfoot></table>';
   }
 
+  // Days (with facility + time) on which a given level is scheduled, honoring
+  // the active filters. Rendered inside each "Classes by level" row, shown on click.
+  function levelDaysHtml(level){
+    const facs = facList();
+    const byDay = {}; // dayIdx -> [{ fac, b }]
+    facs.forEach(function(f){
+      (store[f.id] || []).forEach(function(b){
+        if (!pass(b)) return;
+        if ((b.level || '(no level)') !== level) return;
+        (byDay[b.day] = byDay[b.day] || []).push({ fac:f, b:b });
+      });
+    });
+    const days = Object.keys(byDay).map(Number).sort(function(a,b){ return a-b; });
+    if (!days.length) return '<div class="t-lvl-day" style="color:var(--t-muted);font-style:italic">No matching classes.</div>';
+    return days.map(function(d){
+      const entries = byDay[d].slice().sort(function(x,y){ return timeToMin(x.b.start) - timeToMin(y.b.start); });
+      const chips = entries.map(function(e){
+        return '<span class="t-lvl-chip" style="border-left-color:'+e.fac.color+'"><b style="color:'+e.fac.color+'">'+esc(e.fac.name)+'</b> '+
+          fmtT(e.b.start)+'–'+fmtT(e.b.end)+(e.b.semester ? ' &middot; SEM' : '')+
+          (e.b.notes ? ' <span title="'+esc(e.b.notes)+'" style="cursor:help">&#9998;</span>' : '')+'</span>';
+      }).join('');
+      return '<div class="t-lvl-day"><span class="t-lvl-dayname">'+DAYS[d]+'</span><div class="t-lvl-chips">'+chips+'</div></div>';
+    }).join('');
+  }
+
   // Junior classes that occur more than once on the same day — counted across
   // every facility currently in scope ("as a whole"), grouped by day.
   function jrDupSection(){
@@ -3566,13 +3601,19 @@ async function importLocalStorage() {
       else {
         const max = Math.max(1, rows[0].tot);
         lb.innerHTML =
-          '<div class="t-legend" style="margin:0 0 10px"><span><i style="background:'+SEM_C+'"></i>Semester</span><span><i style="background:'+REG_C+'"></i>Non-semester</span></div>' +
+          '<div class="t-legend" style="margin:0 0 10px"><span><i style="background:'+SEM_C+'"></i>Semester</span><span><i style="background:'+REG_C+'"></i>Non-semester</span><span style="font-style:italic">click a level to see its days</span></div>' +
           '<div class="t-bars">' + rows.map(function(r){
           const semW = r.sem/max*100, regW = r.reg/max*100;
           const semSeg = r.sem ? '<span class="t-bar" style="width:'+semW+'%;background:'+SEM_C+'" title="'+esc(r.l)+' — semester: '+r.sem+'">'+(semW>9 ? r.sem : '')+'</span>' : '';
           const regSeg = r.reg ? '<span class="t-bar" style="width:'+regW+'%;background:'+REG_C+'" title="'+esc(r.l)+' — non-semester: '+r.reg+'">'+(regW>9 ? r.reg : '')+'</span>' : '';
-          return '<div class="t-barrow"><span title="'+esc(r.l)+'">'+esc(r.l)+'</span><div class="t-bartrack">'+(semSeg+regSeg)+'<span class="t-bartot">'+r.tot+'</span></div></div>';
+          return '<div class="t-lvl">' +
+            '<div class="t-barrow"><span title="'+esc(r.l)+'"><span class="t-lvl-arrow">▶</span>'+esc(r.l)+'</span><div class="t-bartrack">'+(semSeg+regSeg)+'<span class="t-bartot">'+r.tot+'</span></div></div>' +
+            '<div class="t-lvl-detail">'+levelDaysHtml(r.l)+'</div>' +
+          '</div>';
         }).join('') + '</div>';
+        lb.querySelectorAll('.t-lvl .t-barrow').forEach(function(row){
+          row.onclick = function(){ row.parentNode.classList.toggle('open'); };
+        });
       }
     }
     jrDupSection();
