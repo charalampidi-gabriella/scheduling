@@ -2926,19 +2926,22 @@ async function importLocalStorage() {
   }
 
   function blockCat(b){ return b.category || (b.juniorAge ? 'junior' : 'adult'); }
+  // A class that lives only on the hitting wall (last "court"). These count
+  // toward totals but are never flagged as duplicates.
+  function isWallBlock(b){ return Array.isArray(b.courts) && b.courts.length > 0 && b.courts.every(function(c){ return c === COURT_COUNT; }); }
   function renderGrid(){
     const g = document.getElementById('ms-grid');
-    // Junior duplicate check: same level + same day + same facility.
+    // Junior duplicate check: same level + same day + same facility (wall classes excluded).
     const jrLevelCount = {};
     (msState[activeFacility].blocks||[]).forEach(function(b){
-      if (b.day===activeDay && blockCat(b)==='junior'){ const lv=b.level||''; jrLevelCount[lv]=(jrLevelCount[lv]||0)+1; }
+      if (b.day===activeDay && blockCat(b)==='junior' && !isWallBlock(b)){ const lv=b.level||''; jrLevelCount[lv]=(jrLevelCount[lv]||0)+1; }
     });
     const dupGroupKey = {}; // level -> "A","B",...
     let dupIdx = 0;
     Object.keys(jrLevelCount).forEach(function(lv){
       if (jrLevelCount[lv] > 1) { dupGroupKey[lv] = dupIdx < 26 ? String.fromCharCode(65+dupIdx) : '*'; dupIdx++; }
     });
-    function dupKeyFor(b){ return (blockCat(b)==='junior') ? (dupGroupKey[b.level||''] || '') : ''; }
+    function dupKeyFor(b){ return (blockCat(b)==='junior' && !isWallBlock(b)) ? (dupGroupKey[b.level||''] || '') : ''; }
     let html = '<div class="ms-gh">Time</div>';
     for (let i = 0; i < COURT_LABELS.length; i++){
       const lbl = COURT_LABELS[i];
@@ -3184,9 +3187,10 @@ async function importLocalStorage() {
     const courts = selectedCourts.slice().sort(function(a,b){ return a-b; });
     const blocks = msState[activeFacility].blocks;
     if (category === 'junior'){
-      const clash = blocks.some(function(x){
+      const newIsWall = courts.length > 0 && courts.every(function(c){ return c === COURT_COUNT; });
+      const clash = !newIsWall && blocks.some(function(x){
         if (editingId && x.id === editingId) return false;
-        return blockCat(x)==='junior' && x.day===day && (x.level||'')===level;
+        return blockCat(x)==='junior' && x.day===day && (x.level||'')===level && !isWallBlock(x);
       });
       if (clash){
         const facName = (FACILITIES.find(function(f){ return f.id===activeFacility; })||{name:activeFacility}).name;
@@ -3305,6 +3309,9 @@ async function importLocalStorage() {
   function hoursOf(b){ return Math.max(0, (timeToMin(b.end)-timeToMin(b.start))/60); }
   function isMorning(b){ return timeToMin(b.start) < 14*60; }
   function catOf(b){ return b.category || (b.juniorAge ? 'junior' : 'adult'); }
+  // A class that lives only on the hitting wall (last "court") — still counted
+  // in the totals, but excluded from the same-day duplicate check.
+  function isWallBlock(b){ return Array.isArray(b.courts) && b.courts.length > 0 && b.courts.every(function(c){ return c === COURT_COUNT; }); }
   function r1(n){ return Math.round((n+Number.EPSILON)*10)/10; }
   function pct(a,b){ return b ? Math.round(a/b*100) : 0; }
   function fmtT(t){ const a=String(t||'0:0').split(':').map(Number); const h=a[0]||0, m=a[1]||0; const p=h>=12?'p':'a'; const hh=((h+11)%12)+1; return m ? (hh+':'+(m<10?'0'+m:m)+p) : (hh+p); }
@@ -3542,7 +3549,7 @@ async function importLocalStorage() {
     const byDay = {}; // dayIdx -> level -> [{ fac, b }]
     facs.forEach(function(f){
       (store[f.id] || []).forEach(function(b){
-        if (catOf(b) !== 'junior' || !pass(b)) return;
+        if (catOf(b) !== 'junior' || !pass(b) || isWallBlock(b)) return;
         const lv = b.level || '(no level)';
         (byDay[b.day] = byDay[b.day] || {});
         (byDay[b.day][lv] = byDay[b.day][lv] || []).push({ fac:f, b:b });
