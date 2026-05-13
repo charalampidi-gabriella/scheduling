@@ -3379,6 +3379,7 @@ async function importLocalStorage() {
     el.innerHTML =
       '<div class="t-filters" id="t-filters"></div>' +
       '<div class="t-legend" id="t-legend"></div>' +
+      '<div class="t-section"><h3>Semester vs non-semester</h3><div id="t-sembars"></div></div>' +
       '<div class="t-section"><h3>Duplicate junior classes (same day)</h3><div id="t-jrdups"></div></div>' +
       '<div class="t-section"><h3>Classes by level</h3><div id="t-levelbars"></div></div>' +
       '<div class="t-section"><h3>Detail by location</h3><div id="t-bylevel"></div></div>';
@@ -3497,6 +3498,34 @@ async function importLocalStorage() {
       '</tbody><tfoot><tr class="total"><td>All levels</td>'+colTot.map(function(v){ return '<td>'+v+'</td>'; }).join('')+'<td>'+grand+'</td></tr></tfoot></table>';
   }
 
+  // Stacked bar: semester vs non-semester class counts per facility (plus an
+  // "All locations" bar). Ignores the Program filter on purpose — the point is
+  // to read the split at a glance without toggling filters.
+  function semBarSection(){
+    const el = document.getElementById('t-sembars'); if (!el) return;
+    const facs = facList();
+    const prevSem = filters.sem; filters.sem = 'all';
+    const summ = facs.map(function(f){ return { f:f, s:summarize(f.id) }; });
+    filters.sem = prevSem;
+    const rowsData = summ.map(function(x){ return { label:x.f.name, sem:x.s.sem, reg:x.s.count - x.s.sem, tot:x.s.count }; });
+    const grand = { label:'All locations', sem:0, reg:0, tot:0 };
+    rowsData.forEach(function(r){ grand.sem+=r.sem; grand.reg+=r.reg; grand.tot+=r.tot; });
+    if (!grand.tot){ el.innerHTML = '<div class="t-empty">No classes match the current filters.</div>'; return; }
+    const all = facs.length > 1 ? rowsData.concat([grand]) : rowsData;
+    const max = Math.max(1, Math.max.apply(null, all.map(function(r){ return r.tot; })));
+    const SEM_C = '#1b4458', REG_C = '#2596b5';
+    const semPct = grand.tot ? Math.round(grand.sem/grand.tot*100) : 0;
+    el.innerHTML =
+      '<div class="t-legend" style="margin:0 0 12px"><span><i style="background:'+SEM_C+'"></i>Semester</span><span><i style="background:'+REG_C+'"></i>Non-semester</span>' +
+        '<span><b style="color:var(--t-navy)">'+grand.sem+'</b> semester &middot; <b style="color:var(--t-navy)">'+grand.reg+'</b> non-semester &middot; <b style="color:var(--t-navy)">'+semPct+'%</b> semester</span></div>' +
+      '<div class="t-bars">' + all.map(function(r){
+        const semW = r.sem/max*100, regW = r.reg/max*100;
+        const semSeg = r.sem ? '<span class="t-bar" style="width:'+semW+'%;background:'+SEM_C+'" title="'+esc(r.label)+' — semester: '+r.sem+'">'+(semW>9?r.sem:'')+'</span>' : '';
+        const regSeg = r.reg ? '<span class="t-bar" style="width:'+regW+'%;background:'+REG_C+'" title="'+esc(r.label)+' — non-semester: '+r.reg+'">'+(regW>9?r.reg:'')+'</span>' : '';
+        return '<div class="t-barrow"><span>'+esc(r.label)+'</span><div class="t-bartrack">'+((semSeg+regSeg) || '<span style="color:var(--t-muted)">—</span>')+'<span class="t-bartot">'+r.tot+'</span></div></div>';
+      }).join('') + '</div>';
+  }
+
   // Junior classes that occur more than once on the same day — counted across
   // every facility currently in scope ("as a whole"), grouped by day.
   function jrDupSection(){
@@ -3566,6 +3595,7 @@ async function importLocalStorage() {
         }).join('') + '</div>';
       }
     }
+    semBarSection();
     jrDupSection();
     levelTable();
   }
