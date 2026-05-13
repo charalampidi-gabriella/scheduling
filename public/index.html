@@ -140,6 +140,15 @@
 #pane-totals table.t-table tbody tr:hover { background:rgba(149,214,0,0.08); }
 #pane-totals table.t-table tfoot td, #pane-totals table.t-table tr.total td { font-weight:700; background:var(--t-plat); }
 #pane-totals .t-empty { color:var(--t-muted); font-style:italic; padding:24px; text-align:center; border:1px dashed var(--t-border); border-radius:8px; }
+#pane-totals .t-jrdup-summary { font-size:13px; color:var(--t-navy); margin-bottom:14px; }
+#pane-totals .t-jrdup-summary b { font-weight:800; }
+#pane-totals .t-jrdup-day { margin-bottom:12px; border:1px solid var(--t-border); border-radius:8px; overflow:hidden; }
+#pane-totals .t-jrdup-dayname { background:var(--t-plat); padding:6px 12px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--t-navy); }
+#pane-totals .t-jrdup-row { display:grid; grid-template-columns:210px 1fr; gap:10px; align-items:center; padding:8px 12px; border-top:1px solid var(--t-border); font-size:13px; }
+#pane-totals .t-jrdup-lvl { font-weight:600; color:var(--t-navy); }
+#pane-totals .t-jrdup-x { display:inline-block; background:#dc2626; color:#fff; border-radius:4px; padding:0 5px; font-size:11px; font-weight:700; margin-left:4px; vertical-align:middle; }
+#pane-totals .t-jrdup-chips { display:flex; gap:6px; flex-wrap:wrap; }
+#pane-totals .t-jrdup-chip { border:1px solid var(--t-border); border-left-width:3px; border-radius:4px; padding:2px 8px; font-size:12px; color:var(--t-muted); background:#fff; white-space:nowrap; }
 </style>
 <style>
 :root {
@@ -3288,6 +3297,7 @@ async function importLocalStorage() {
   function catOf(b){ return b.category || (b.juniorAge ? 'junior' : 'adult'); }
   function r1(n){ return Math.round((n+Number.EPSILON)*10)/10; }
   function pct(a,b){ return b ? Math.round(a/b*100) : 0; }
+  function fmtT(t){ const a=String(t||'0:0').split(':').map(Number); const h=a[0]||0, m=a[1]||0; const p=h>=12?'p':'a'; const hh=((h+11)%12)+1; return m ? (hh+':'+(m<10?'0'+m:m)+p) : (hh+p); }
 
   async function load(){
     try {
@@ -3369,6 +3379,7 @@ async function importLocalStorage() {
     el.innerHTML =
       '<div class="t-filters" id="t-filters"></div>' +
       '<div class="t-legend" id="t-legend"></div>' +
+      '<div class="t-section"><h3>Duplicate junior classes (same day)</h3><div id="t-jrdups"></div></div>' +
       '<div class="t-section"><h3>Classes by level</h3><div id="t-levelbars"></div></div>' +
       '<div class="t-section"><h3>Detail by location</h3><div id="t-bylevel"></div></div>';
     return el;
@@ -3486,6 +3497,48 @@ async function importLocalStorage() {
       '</tbody><tfoot><tr class="total"><td>All levels</td>'+colTot.map(function(v){ return '<td>'+v+'</td>'; }).join('')+'<td>'+grand+'</td></tr></tfoot></table>';
   }
 
+  // Junior classes that occur more than once on the same day — counted across
+  // every facility currently in scope ("as a whole"), grouped by day.
+  function jrDupSection(){
+    const el = document.getElementById('t-jrdups'); if (!el) return;
+    const facs = facList();
+    const byDay = {}; // dayIdx -> level -> [{ fac, b }]
+    facs.forEach(function(f){
+      (store[f.id] || []).forEach(function(b){
+        if (catOf(b) !== 'junior' || !pass(b)) return;
+        const lv = b.level || '(no level)';
+        (byDay[b.day] = byDay[b.day] || {});
+        (byDay[b.day][lv] = byDay[b.day][lv] || []).push({ fac:f, b:b });
+      });
+    });
+    let dupLevelCount = 0, extraCount = 0;
+    const dayBlocks = [];
+    for (let d = 0; d < 7; d++){
+      if (!byDay[d]) continue;
+      const dups = Object.keys(byDay[d]).filter(function(lv){ return byDay[d][lv].length >= 2; })
+        .sort(function(a,b){ return byDay[d][b].length - byDay[d][a].length || a.localeCompare(b); });
+      if (!dups.length) continue;
+      const rows = dups.map(function(lv){
+        const entries = byDay[d][lv].slice().sort(function(x,y){ return timeToMin(x.b.start) - timeToMin(y.b.start); });
+        dupLevelCount++; extraCount += entries.length - 1;
+        const chips = entries.map(function(e){
+          return '<span class="t-jrdup-chip" style="border-left-color:'+e.fac.color+'"><b style="color:'+e.fac.color+'">'+esc(e.fac.name)+'</b> '+fmtT(e.b.start)+'–'+fmtT(e.b.end)+
+            (e.b.semester ? ' &middot; SEM' : '') + (e.b.notes ? ' <span title="'+esc(e.b.notes)+'" style="cursor:help">&#9998;</span>' : '') + '</span>';
+        }).join('');
+        return '<div class="t-jrdup-row"><span class="t-jrdup-lvl">'+esc(lv)+'<span class="t-jrdup-x">×'+entries.length+'</span></span><div class="t-jrdup-chips">'+chips+'</div></div>';
+      }).join('');
+      dayBlocks.push('<div class="t-jrdup-day"><div class="t-jrdup-dayname">'+DAYS[d]+'</div>'+rows+'</div>');
+    }
+    if (!dayBlocks.length){
+      el.innerHTML = '<div class="t-empty">No junior class is scheduled more than once on any day' +
+        (filters.loc !== 'all' ? ' at ' + esc(facs[0].name) : '') + '.</div>';
+      return;
+    }
+    el.innerHTML = '<div class="t-jrdup-summary"><b>'+dupLevelCount+'</b> duplicated level'+(dupLevelCount===1?'':'s')+
+      ' &middot; <b>'+extraCount+'</b> extra class'+(extraCount===1?'':'es')+' beyond the first'+
+      (filters.loc !== 'all' ? ' &middot; '+esc(facs[0].name)+' only' : ' across all locations')+'</div>' + dayBlocks.join('');
+  }
+
   function renderResults(){
     const facs = facList();
     const summ = facs.map(function(f){ return summarize(f.id); });
@@ -3513,6 +3566,7 @@ async function importLocalStorage() {
         }).join('') + '</div>';
       }
     }
+    jrDupSection();
     levelTable();
   }
 
