@@ -47,10 +47,10 @@
 #pane-master .ms-ghc input:focus { outline:none; background:rgba(149,214,0,0.12); box-shadow:inset 0 0 0 2px var(--ms-green); }
 #pane-master .ms-ghc input::placeholder { color:#b0bcc1; font-weight:400; }
 #pane-master .ms-ghc.drop-target { background:rgba(149,214,0,0.18); box-shadow:inset 0 0 0 2px var(--ms-green); }
-#pane-master .ms-tcol { display:grid; grid-auto-rows:36px; border-right:1px solid var(--ms-border); }
+#pane-master .ms-tcol { display:grid; grid-auto-rows:18px; border-right:1px solid var(--ms-border); }
 #pane-master .ms-tlabel { font-size:12px; color:var(--ms-muted); padding:0 8px; border-top:1px solid var(--ms-border); display:flex; align-items:flex-start; justify-content:flex-end; padding-top:2px; background:var(--ms-plat); }
 #pane-master .ms-tlabel.hour { font-weight:600; color:var(--ms-navy); }
-#pane-master .ms-ccol { position:relative; display:grid; grid-auto-rows:36px; border-right:1px solid var(--ms-border); cursor:cell; }
+#pane-master .ms-ccol { position:relative; display:grid; grid-auto-rows:18px; border-right:1px solid var(--ms-border); cursor:cell; }
 #pane-master .ms-ccol:last-child { border-right:none; }
 #pane-master .ms-slot { border-top:1px solid var(--ms-border); }
 #pane-master .ms-slot.hour { border-top-color:#c2cdcf; }
@@ -2676,11 +2676,11 @@ async function importLocalStorage() {
   const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const COURT_LABELS = ['1','2','3','4','5','W'];
   const COURT_COUNT = COURT_LABELS.length;
-  const SLOT_MIN = 30, START_HOUR = 6, END_HOUR = 22;
+  const SLOT_MIN = 15, START_HOUR = 6, END_HOUR = 22;
   const SLOTS_PER_HOUR = 60 / SLOT_MIN;
   const TOTAL_SLOTS = (END_HOUR - START_HOUR) * SLOTS_PER_HOUR;
-  const SLOT_PX = 36;
-  const FIRST_EVENING_SLOT = 18;
+  const SLOT_PX = 18;
+  const FIRST_EVENING_SLOT = (15 - START_HOUR) * SLOTS_PER_HOUR; // 3 PM
   const MORNING_RANGE = { label:'6a-2p' };
   const EVENING_RANGE = { label:'3p-10p' };
   const COLORS = ['#2596b5','#1b4458','#95d600','#7c4dff','#f57c00','#c2185b','#00897b','#5d4037'];
