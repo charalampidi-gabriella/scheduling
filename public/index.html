@@ -449,6 +449,20 @@ tr.coach-locked > td.t-today { background: #fef9c3 !important; }
 .day-col:hover .shift-lock-icon { opacity: 1; }
 .shift-lock-icon.locked { opacity: 1; }
 
+.shift-note-icon {
+  font-size: 10px; color: #64748b; cursor: pointer; opacity: 0;
+  transition: opacity 0.1s, color 0.1s; line-height: 1;
+  user-select: none; padding: 0 2px;
+}
+.day-col:hover .shift-note-icon { opacity: 0.7; }
+.shift-note-icon:hover { color: #2563eb; opacity: 1 !important; }
+.shift-note-icon.has-note { opacity: 1; color: #2563eb; }
+.shift-note-text {
+  font-size: 10px; color: #475569; font-style: italic; line-height: 1.2;
+  margin-top: 2px; cursor: pointer; word-break: break-word;
+}
+.shift-note-text:hover { color: #2563eb; }
+
 /* ── PLANNER TAB ── */
 .planner-layout { display: grid; grid-template-columns: 260px 1fr; gap: 20px; align-items: start; }
 @media (max-width: 900px) { .planner-layout { grid-template-columns: 1fr; } }
@@ -961,6 +975,20 @@ function ss(cid, day, v) {
   const key = sk(cid, day);
   schedule[key] = v;
   persistActive();
+}
+
+function editShiftNote(cid, day, shift) {
+  const key = sk(cid, day);
+  const entry = schedule[key];
+  if (!entry || !entry[shift]) return;
+  const field = shift + 'Note';
+  const existing = entry[field] || '';
+  const next = prompt(`Note for ${shift} shift (leave empty to clear):`, existing);
+  if (next === null) return;
+  const trimmed = next.trim();
+  if (trimmed) entry[field] = trimmed; else delete entry[field];
+  persistActive();
+  render();
 }
 
 // ── SCOPE: Current + named Drafts ─────────────────────────────────────────────
@@ -1756,8 +1784,8 @@ function renderOverview() {
         const editable = !locked && !isReadOnly();
         return `<td class="day-col" onclick="${editable ? `openModal(${c.id}, ${i})` : ''}" style="${editable?'':'cursor:default'}">
           <div class="cell-inner">
-            ${s.morning ? `<div><div class="shift-lock-wrap">${badge('morning', s.morning, mLocked)}${!locked ? `<span class="shift-lock-icon ${mLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'morning')">${mLocked?'🔒':'🔒'}</span>` : ''}</div>${s.morningFrom && s.morningFrom !== c.name?`<div class="from-tag">← from ${s.morningFrom}</div>`:''}${s.morningNew?`<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>`:''}</div>` : ''}
-            ${s.evening ? `<div><div class="shift-lock-wrap">${badge('evening', s.evening, eLocked)}${!locked ? `<span class="shift-lock-icon ${eLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'evening')">${eLocked?'🔒':'🔒'}</span>` : ''}</div>${s.eveningFrom && s.eveningFrom !== c.name?`<div class="from-tag">← from ${s.eveningFrom}</div>`:''}${s.eveningNew?`<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>`:''}</div>` : ''}
+            ${s.morning ? `<div><div class="shift-lock-wrap">${badge('morning', s.morning, mLocked)}${!locked ? `<span class="shift-lock-icon ${mLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'morning')">${mLocked?'🔒':'🔒'}</span>` : ''}<span class="shift-note-icon ${s.morningNote?'has-note':''}" title="${s.morningNote ? 'Edit note' : 'Add note'}" onclick="event.stopPropagation();editShiftNote(${c.id},${i},'morning')">+</span></div>${s.morningFrom && s.morningFrom !== c.name?`<div class="from-tag">← from ${s.morningFrom}</div>`:''}${s.morningNew?`<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>`:''}${s.morningNote?`<div class="shift-note-text" title="Edit note" onclick="event.stopPropagation();editShiftNote(${c.id},${i},'morning')">${s.morningNote.replace(/</g,'&lt;')}</div>`:''}</div>` : ''}
+            ${s.evening ? `<div><div class="shift-lock-wrap">${badge('evening', s.evening, eLocked)}${!locked ? `<span class="shift-lock-icon ${eLocked?'locked':''}" onclick="event.stopPropagation();toggleShiftLock(${c.id},${i},'evening')">${eLocked?'🔒':'🔒'}</span>` : ''}<span class="shift-note-icon ${s.eveningNote?'has-note':''}" title="${s.eveningNote ? 'Edit note' : 'Add note'}" onclick="event.stopPropagation();editShiftNote(${c.id},${i},'evening')">+</span></div>${s.eveningFrom && s.eveningFrom !== c.name?`<div class="from-tag">← from ${s.eveningFrom}</div>`:''}${s.eveningNew?`<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">+ new shift</div>`:''}${s.eveningNote?`<div class="shift-note-text" title="Edit note" onclick="event.stopPropagation();editShiftNote(${c.id},${i},'evening')">${s.eveningNote.replace(/</g,'&lt;')}</div>`:''}</div>` : ''}
             ${!s.morning && !s.evening ? `<span class="cell-empty">\u2014</span>` : ''}
           </div>
           ${editable ? '<div class="cell-add">+ add</div>' : ''}
