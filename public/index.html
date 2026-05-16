@@ -2720,13 +2720,14 @@ async function importLocalStorage() {
   const MORNING_RANGE = { label:'6a-2p' };
   const EVENING_RANGE = { label:'3p-10p' };
   const COLORS = ['#2596b5','#1b4458','#95d600','#7c4dff','#f57c00','#c2185b','#00897b','#5d4037'];
-  const ADULT_LEVELS = ['Beginner','Advanced Beginner','2.0-2.5','2.5-3.0','3.0','3.0-3.5','3.5','3.5-4.0','4.0','4.0-4.5','4.5','4.5-5.0','Serving Clinic','Private'];
+  const ADULT_LEVELS = ['Beginner','Advanced Beginner','2.0-2.5','2.5-3.0','3.0','3.0-3.5','3.5','3.5-4.0','4.0','4.0-4.5','4.5','4.5-5.0','Serving Clinic','Lunchtime Express Clinic','Private'];
   const JUNIOR_AGES = ['3-4','5-8','9-11','12-15'];
   const JUNIOR_SKILLS = ['Beginner','Intermediate','Advanced'];
   function juniorSkillsFor(age){ return age==='3-4' ? ['Beginner'] : JUNIOR_SKILLS; }
   function composeLevel(cat,al,ja,js){
     if (cat==='adult') return al || '';
     if (cat==='junior') return 'Jr ' + ja + ' . ' + js;
+    if (cat==='lunchtime') return 'Lunchtime Express';
     return '';
   }
 
@@ -2817,7 +2818,7 @@ async function importLocalStorage() {
       '<div class="ms-overlay" id="ms-overlay">' +
         '<div class="ms-modal">' +
           '<h2 id="ms-modal-title">Add class</h2>' +
-          '<label class="ms-field">Category<select id="ms-f-category"><option value="adult">Adult</option><option value="junior">Junior</option></select></label>' +
+          '<label class="ms-field">Category<select id="ms-f-category"><option value="adult">Adult</option><option value="junior">Junior</option><option value="lunchtime">Lunchtime Express Clinic</option></select></label>' +
           '<div class="ms-row" id="ms-adult-row"><label class="ms-field" style="flex:1;">Adult level<select id="ms-f-adult-level"></select></label></div>' +
           '<div class="ms-row" id="ms-junior-row" style="display:none;">' +
             '<label class="ms-field">Age group<select id="ms-f-junior-age"></select></label>' +
