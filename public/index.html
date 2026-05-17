@@ -34,35 +34,36 @@
 #pane-master .ms-chip:active { cursor:grabbing; }
 #pane-master .ms-chip.assigned { opacity:0.4; }
 #pane-master .ms-pool-empty { color:var(--ms-muted); font-size:12px; font-style:italic; }
-#pane-master .ms-grid { display:grid; grid-template-columns:80px repeat(6,1fr); border:1px solid var(--ms-border); border-radius:6px; overflow:hidden; background:#fff; }
-#pane-master .ms-gh { background:var(--ms-plat); padding:10px 6px; font-size:13px; font-weight:700; color:var(--ms-navy); text-align:center; border-bottom:1px solid var(--ms-border); border-right:1px solid var(--ms-border); }
-#pane-master .ms-gh:last-child { border-right:none; }
-#pane-master .ms-ghc { background:#fff; border-bottom:1px solid var(--ms-border); border-right:1px solid var(--ms-border); padding:0; min-height:32px; display:flex; align-items:stretch; }
-#pane-master .ms-ghc:last-child { border-right:none; }
-#pane-master .ms-ghc.label { background:var(--ms-plat); justify-content:center; align-items:center; font-size:10px; color:var(--ms-navy); font-weight:700; text-transform:uppercase; letter-spacing:0.6px; padding:0 6px; }
-#pane-master .ms-ghc.label.morning { border-left:4px solid var(--ms-navy); }
-#pane-master .ms-ghc.label.evening { border-left:4px solid var(--ms-blue); }
+#pane-master .ms-gridwrap { overflow-x:auto; border:1px solid var(--ms-border); border-radius:6px; background:#fff; }
+#pane-master .ms-grid { display:flex; flex-direction:column; min-width:max-content; }
+#pane-master .ms-row { display:grid; grid-template-columns:60px 120px 1fr 120px; border-bottom:1px solid var(--ms-border); }
+#pane-master .ms-row:last-child { border-bottom:none; }
+#pane-master .ms-row.header { background:var(--ms-plat); }
+#pane-master .ms-rh { background:var(--ms-plat); padding:8px 6px; font-size:12px; font-weight:700; color:var(--ms-navy); text-align:center; display:flex; align-items:center; justify-content:center; border-right:1px solid var(--ms-border); }
+#pane-master .ms-gh { background:var(--ms-plat); padding:8px 6px; font-size:11px; font-weight:700; color:var(--ms-navy); text-align:center; border-right:1px solid var(--ms-border); display:flex; align-items:center; justify-content:center; }
+#pane-master .ms-ghc { background:#fff; border-right:1px solid var(--ms-border); padding:0; min-height:32px; display:flex; align-items:stretch; }
+#pane-master .ms-ghc.morning { border-left:4px solid var(--ms-navy); }
+#pane-master .ms-ghc.evening { border-left:4px solid var(--ms-blue); border-right:none; }
 #pane-master .ms-ghc input { width:100%; border:none; background:transparent; padding:4px 8px; font:inherit; font-size:12px; color:var(--ms-navy); font-weight:600; }
 #pane-master .ms-ghc input:hover { background:var(--ms-plat); }
 #pane-master .ms-ghc input:focus { outline:none; background:rgba(149,214,0,0.12); box-shadow:inset 0 0 0 2px var(--ms-green); }
 #pane-master .ms-ghc input::placeholder { color:#b0bcc1; font-weight:400; }
 #pane-master .ms-ghc.drop-target { background:rgba(149,214,0,0.18); box-shadow:inset 0 0 0 2px var(--ms-green); }
-#pane-master .ms-tcol { display:grid; grid-auto-rows:18px; border-right:1px solid var(--ms-border); }
-#pane-master .ms-tlabel { font-size:12px; color:var(--ms-muted); padding:0 8px; border-top:1px solid var(--ms-border); display:flex; align-items:flex-start; justify-content:flex-end; padding-top:2px; background:var(--ms-plat); }
+#pane-master .ms-trow { display:grid; grid-auto-columns:18px; grid-auto-flow:column; border-right:1px solid var(--ms-border); height:28px; }
+#pane-master .ms-tlabel { font-size:11px; color:var(--ms-muted); padding:0 4px; border-left:1px solid var(--ms-border); display:flex; align-items:center; justify-content:flex-start; background:var(--ms-plat); white-space:nowrap; }
 #pane-master .ms-tlabel.hour { font-weight:600; color:var(--ms-navy); }
-#pane-master .ms-ccol { position:relative; display:grid; grid-auto-rows:18px; border-right:1px solid var(--ms-border); cursor:cell; }
-#pane-master .ms-ccol:last-child { border-right:none; }
-#pane-master .ms-slot { border-top:1px solid var(--ms-border); }
-#pane-master .ms-slot.hour { border-top-color:#c2cdcf; }
-#pane-master .ms-slot.half { border-top-style:dashed; border-top-color:#ecf0f1; }
-#pane-master .ms-camp { position:absolute; left:0; right:0; background:var(--ms-camp); border-top:2px dotted var(--ms-camp-edge); border-bottom:2px dotted var(--ms-camp-edge); pointer-events:none; z-index:1; }
-#pane-master .ms-camp-lbl { position:absolute; bottom:2px; left:4px; font-size:9px; color:var(--ms-navy); font-weight:600; letter-spacing:0.5px; opacity:0.7; }
-#pane-master .ms-preview { position:absolute; left:0; right:0; background:rgba(149,214,0,0.35); border:2px dashed var(--ms-navy); border-radius:4px; pointer-events:none; z-index:4; color:var(--ms-navy); font-size:11px; padding:4px 6px; font-weight:600; }
-#pane-master .ms-block { position:absolute; left:2px; right:2px; background:var(--ms-blue); color:#fff; border-radius:4px; padding:5px 7px; font-size:12px; line-height:1.3; overflow:hidden; cursor:move; z-index:3; border:2px solid transparent; box-shadow:0 1px 2px rgba(0,0,0,0.08); }
+#pane-master .ms-crow { position:relative; display:grid; grid-auto-columns:18px; grid-auto-flow:column; border-right:1px solid var(--ms-border); cursor:cell; height:72px; }
+#pane-master .ms-slot { border-left:1px solid var(--ms-border); }
+#pane-master .ms-slot.hour { border-left-color:#c2cdcf; }
+#pane-master .ms-slot.half { border-left-style:dashed; border-left-color:#ecf0f1; }
+#pane-master .ms-camp { position:absolute; top:0; bottom:0; background:var(--ms-camp); border-left:2px dotted var(--ms-camp-edge); border-right:2px dotted var(--ms-camp-edge); pointer-events:none; z-index:1; }
+#pane-master .ms-camp-lbl { position:absolute; top:2px; left:4px; font-size:9px; color:var(--ms-navy); font-weight:600; letter-spacing:0.5px; opacity:0.7; }
+#pane-master .ms-preview { position:absolute; top:0; bottom:0; background:rgba(149,214,0,0.35); border:2px dashed var(--ms-navy); border-radius:4px; pointer-events:none; z-index:4; color:var(--ms-navy); font-size:11px; padding:4px 6px; font-weight:600; white-space:nowrap; }
+#pane-master .ms-block { position:absolute; top:2px; bottom:2px; background:var(--ms-blue); color:#fff; border-radius:4px; padding:5px 7px; font-size:12px; line-height:1.3; overflow:hidden; cursor:move; z-index:3; border:2px solid transparent; box-shadow:0 1px 2px rgba(0,0,0,0.08); }
 #pane-master .ms-block:hover { filter:brightness(1.08); }
 #pane-master .ms-block.dragging { opacity:0.8; box-shadow:0 6px 16px rgba(0,0,0,0.3); z-index:10; }
-#pane-master .ms-block .ms-resize { position:absolute; left:0; right:0; bottom:0; height:8px; cursor:ns-resize; }
-#pane-master .ms-block .ms-resize::after { content:''; position:absolute; left:50%; bottom:2px; transform:translateX(-50%); width:22px; height:3px; border-radius:2px; background:rgba(255,255,255,0.55); }
+#pane-master .ms-block .ms-resize { position:absolute; top:0; bottom:0; right:0; width:8px; cursor:ew-resize; }
+#pane-master .ms-block .ms-resize::after { content:''; position:absolute; top:50%; right:2px; transform:translateY(-50%); width:3px; height:22px; border-radius:2px; background:rgba(255,255,255,0.55); }
 #pane-master .ms-block:hover .ms-resize::after { background:rgba(255,255,255,0.9); }
 #pane-master .ms-block .ms-btitle { font-weight:700; }
 #pane-master .ms-block .ms-bmeta { font-size:10px; opacity:0.95; margin-top:1px; }
@@ -2748,6 +2749,9 @@ async function importLocalStorage() {
   function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
   function slotToY(s){ return s * SLOT_PX; }
   function yToSlotF(y){ return y / SLOT_PX; }
+  const SLOT_W = 18;
+  function slotToX(s){ return s * SLOT_W; }
+  function xToSlotF(x){ return x / SLOT_W; }
 
   async function bootstrapMS(){
     try {
@@ -2814,7 +2818,7 @@ async function importLocalStorage() {
         '</span>' +
       '</div>' +
       '<div class="ms-pool" id="ms-pool"></div>' +
-      '<div><div class="ms-grid" id="ms-grid"></div></div>' +
+      '<div class="ms-gridwrap"><div class="ms-grid" id="ms-grid"></div></div>' +
       '<div class="ms-overlay" id="ms-overlay">' +
         '<div class="ms-modal">' +
           '<h2 id="ms-modal-title">Add class</h2>' +
@@ -2894,21 +2898,10 @@ async function importLocalStorage() {
     el.querySelectorAll('.ms-daytab').forEach(function(b){ b.onclick = function(){ activeDay = +b.dataset.day; renderDayTabs(); renderPool(); renderGrid(); }; });
   }
 
-  function morningCoachRowHTML(){
+  function coachCellHTML(shift, courtIdx){
     const r = getRosterDay();
-    let h = '<div class="ms-ghc label morning">Morning . '+MORNING_RANGE.label+'</div>';
-    for (let c = 0; c < COURT_COUNT; c++){
-      h += '<div class="ms-ghc"><input data-shift="morning" data-court="'+c+'" placeholder="Coach" value="'+esc(r.morning[c]||'')+'"></div>';
-    }
-    return h;
-  }
-  function eveningCoachRowHTML(){
-    const r = getRosterDay();
-    let h = '<div class="ms-ghc label evening">Evening . '+EVENING_RANGE.label+'</div>';
-    for (let c = 0; c < COURT_COUNT; c++){
-      h += '<div class="ms-ghc"><input data-shift="evening" data-court="'+c+'" placeholder="Coach" value="'+esc(r.evening[c]||'')+'"></div>';
-    }
-    return h;
+    const cls = shift === 'morning' ? 'ms-ghc morning' : 'ms-ghc evening';
+    return '<div class="'+cls+'"><input data-shift="'+shift+'" data-court="'+courtIdx+'" placeholder="Coach" value="'+esc(r[shift][courtIdx]||'')+'"></div>';
   }
 
   function renderPool(){
@@ -2980,36 +2973,42 @@ async function importLocalStorage() {
       if (jrLevelCount[lv] > 1) { dupGroupKey[lv] = dupIdx < 26 ? String.fromCharCode(65+dupIdx) : '*'; dupIdx++; }
     });
     function dupKeyFor(b){ return (blockCat(b)==='junior' && !isWallBlock(b) && !b.approvedDup) ? (dupGroupKey[b.level||''] || '') : ''; }
-    let html = '<div class="ms-gh">Time</div>';
-    for (let i = 0; i < COURT_LABELS.length; i++){
-      const lbl = COURT_LABELS[i];
-      html += '<div class="ms-gh">'+(lbl==='W'?'Wall':'Court '+lbl)+'</div>';
-    }
-    html += morningCoachRowHTML();
-    html += '<div class="ms-tcol">';
+    let html = '';
+    // Header row: court | morning | time labels | evening
+    html += '<div class="ms-row header">';
+    html += '<div class="ms-rh">Court</div>';
+    html += '<div class="ms-gh">Morning<br><span style="font-weight:500;opacity:0.75;">'+MORNING_RANGE.label+'</span></div>';
+    html += '<div class="ms-trow">';
     for (let s = 0; s < TOTAL_SLOTS; s++){
-      const t = slotToTime(s); const isHour = t.indexOf(':00') !== -1 && t.endsWith(':00');
+      const t = slotToTime(s); const isHour = t.endsWith(':00');
       const isEve = (s === FIRST_EVENING_SLOT);
       html += '<div class="ms-tlabel '+(isHour?'hour':'')+'"'+(isEve?' style="color:#2596b5;font-weight:700;"':'')+'>'+(isHour?fmt12(t):'')+'</div>';
     }
     html += '</div>';
+    html += '<div class="ms-gh">Evening<br><span style="font-weight:500;opacity:0.75;">'+EVENING_RANGE.label+'</span></div>';
+    html += '</div>';
+    // One row per court
     for (let c = 1; c <= COURT_COUNT; c++){
-      html += '<div class="ms-ccol" data-court="'+c+'">';
+      const courtLbl = COURT_LABELS[c-1];
+      html += '<div class="ms-row">';
+      html += '<div class="ms-rh">'+(courtLbl==='W'?'Wall':'Court '+courtLbl)+'</div>';
+      html += coachCellHTML('morning', c-1);
+      html += '<div class="ms-crow" data-court="'+c+'">';
       for (let s = 0; s < TOTAL_SLOTS; s++){
         const t = slotToTime(s); const isHour = t.endsWith(':00');
         html += '<div class="ms-slot '+(isHour?'hour':'half')+'" data-slot="'+s+'"></div>';
       }
       if (activeDay <= 3) {
-        const top = slotToY(timeToSlot('09:30'));
-        const height = slotToY(timeToSlot('12:30')) - top;
+        const left = slotToX(timeToSlot('09:30'));
+        const width = slotToX(timeToSlot('12:30')) - left;
         const lbl = c===1 ? '<span class="ms-camp-lbl">SUMMER CAMP ZONE</span>' : '';
-        html += '<div class="ms-camp" style="top:'+top+'px;height:'+height+'px;">'+lbl+'</div>';
+        html += '<div class="ms-camp" style="left:'+left+'px;width:'+width+'px;">'+lbl+'</div>';
       }
       const blocks = (msState[activeFacility].blocks||[]).filter(function(b){ return b.day===activeDay && Array.isArray(b.courts) && b.courts.indexOf(c) !== -1; });
       for (let bi = 0; bi < blocks.length; bi++){
         const b = blocks[bi];
         const ss = timeToSlot(b.start), es = timeToSlot(b.end);
-        const top = slotToY(ss), height = slotToY(es) - top - 2;
+        const left = slotToX(ss), width = slotToX(es) - left - 2;
         const semCls = b.semester ? 'semester' : '';
         const semBadge = b.semester ? '<span class="ms-sembadge">SEM</span>' : '';
         const noteFlag = b.notes ? '<span class="ms-bnoteflag" title="'+esc(b.notes)+'">&#9998;</span>' : '';
@@ -3022,14 +3021,15 @@ async function importLocalStorage() {
         const titleAttr = titleParts.length ? ' title="'+titleParts.join(' — ')+'"' : '';
         const dupBadge = dup ? '<span class="ms-dupbadge" title="'+dupWarn+'">&#9888; '+dKey+'</span>' : '';
         const dupAttr = dup ? ' data-dupkey="'+dKey+'"' : '';
-        html += '<div class="ms-block '+semCls+(dup?' ms-dup':'')+'" data-id="'+b.id+'"'+dupAttr+titleAttr+' style="top:'+top+'px;height:'+height+'px;background:'+blockColor(b)+';"><div class="ms-badges">'+semBadge+dupBadge+noteFlag+'</div><div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div>'+noteHtml+'<div class="ms-resize"></div></div>';
+        html += '<div class="ms-block '+semCls+(dup?' ms-dup':'')+'" data-id="'+b.id+'"'+dupAttr+titleAttr+' style="left:'+left+'px;width:'+width+'px;background:'+blockColor(b)+';"><div class="ms-badges">'+semBadge+dupBadge+noteFlag+'</div><div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div>'+noteHtml+'<div class="ms-resize"></div></div>';
       }
       html += '</div>';
+      html += coachCellHTML('evening', c-1);
+      html += '</div>';
     }
-    html += eveningCoachRowHTML();
     g.innerHTML = html;
     wireCoachInputs(g);
-    g.querySelectorAll('.ms-ccol').forEach(function(col){
+    g.querySelectorAll('.ms-crow').forEach(function(col){
       col.addEventListener('mousedown', onColMouseDown);
     });
     wireBlocks(g);
@@ -3056,24 +3056,24 @@ async function importLocalStorage() {
         const isResize = !!(e.target.closest && e.target.closest('.ms-resize'));
         const s0 = timeToSlot(b.start), e0 = timeToSlot(b.end);
         const dur = e0 - s0;
-        const startY = e.clientY;
+        const startX = e.clientX;
         const meta = el.querySelector('.ms-bmeta');
         const ctTxt = (b.courts && b.courts.length > 1) ? ' . Cts ' + b.courts.map(function(x){ return COURT_LABELS[x-1]; }).join(',') : '';
         let moved = false, cur = { start:s0, end:e0 };
         function paint(){
-          const top = slotToY(cur.start), height = slotToY(cur.end) - top - 2;
-          el.style.top = top + 'px'; el.style.height = height + 'px';
+          const left = slotToX(cur.start), width = slotToX(cur.end) - left - 2;
+          el.style.left = left + 'px'; el.style.width = width + 'px';
           if (meta) meta.textContent = fmt12(slotToTime(cur.start)) + '-' + fmt12(slotToTime(cur.end)) + ctTxt;
         }
         function onMove(ev){
-          const dy = ev.clientY - startY;
-          if (Math.abs(dy) > 3) moved = true;
+          const dx = ev.clientX - startX;
+          if (Math.abs(dx) > 3) moved = true;
           if (isResize){
-            let ne = Math.round(yToSlotF(slotToY(e0) + dy));
+            let ne = Math.round(xToSlotF(slotToX(e0) + dx));
             ne = Math.max(s0 + 1, Math.min(TOTAL_SLOTS, ne));
             cur = { start:s0, end:ne };
           } else {
-            let ns = Math.round(yToSlotF(slotToY(s0) + dy));
+            let ns = Math.round(xToSlotF(slotToX(s0) + dx));
             ns = Math.max(0, Math.min(TOTAL_SLOTS - dur, ns));
             cur = { start:ns, end:ns + dur };
           }
@@ -3091,7 +3091,7 @@ async function importLocalStorage() {
           renderGrid();
         }
         el.classList.add('dragging');
-        document.body.style.cursor = isResize ? 'ns-resize' : 'grabbing';
+        document.body.style.cursor = isResize ? 'ew-resize' : 'grabbing';
         window.addEventListener('mousemove', onMove);
         window.addEventListener('mouseup', onUp, { once:true });
         e.preventDefault();
@@ -3101,8 +3101,8 @@ async function importLocalStorage() {
 
   function slotFromEvent(colEl, e){
     const rect = colEl.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    return Math.max(0, Math.min(TOTAL_SLOTS - 1, Math.floor(y / SLOT_PX)));
+    const x = e.clientX - rect.left;
+    return Math.max(0, Math.min(TOTAL_SLOTS - 1, Math.floor(x / SLOT_W)));
   }
   function onColClick(e){ const b = e.target.closest('.ms-block'); if (b) openEdit(b.dataset.id); }
   function onColMouseDown(e){
@@ -3126,9 +3126,9 @@ async function importLocalStorage() {
   function updateDragPreview(){
     const a = Math.min(drag.startSlot, drag.currentSlot);
     const b = Math.max(drag.startSlot, drag.currentSlot) + 1;
-    const top = slotToY(a), height = slotToY(b) - top - 2;
-    drag.previewEl.style.top = top+'px';
-    drag.previewEl.style.height = height+'px';
+    const left = slotToX(a), width = slotToX(b) - left - 2;
+    drag.previewEl.style.left = left+'px';
+    drag.previewEl.style.width = width+'px';
     drag.previewEl.textContent = fmt12(slotToTime(a)) + ' - ' + fmt12(slotToTime(b));
   }
   function onDragEnd(){
