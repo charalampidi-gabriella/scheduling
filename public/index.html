@@ -2706,13 +2706,15 @@ async function importLocalStorage() {
 // ════════════════════════════════════════════════════════════════════════════
 (function(){
   const FACILITIES = [
-    { id:'satc',  name:'SATC',  key:'master_satc'  },
-    { id:'pharr', name:'Pharr', key:'master_pharr' },
-    { id:'wilco', name:'Wilco', key:'master_wilco' },
+    { id:'satc',  name:'SATC',  key:'master_satc',  labels:['4','5','6','7','8','W'] },
+    { id:'pharr', name:'Pharr', key:'master_pharr', labels:['1','2','3','4','5','W'] },
+    { id:'wilco', name:'Wilco', key:'master_wilco', labels:['1','2','3','4','5','W'] },
   ];
   const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const COURT_LABELS = ['1','2','3','4','5','W'];
-  const COURT_COUNT = COURT_LABELS.length;
+  const DEFAULT_LABELS = ['1','2','3','4','5','W'];
+  function COURT_LABELS_FOR(facId){ const f = FACILITIES.find(function(x){ return x.id===facId; }); return (f && f.labels) || DEFAULT_LABELS; }
+  function COURT_LABELS_(){ return COURT_LABELS_FOR(activeFacility); }
+  const COURT_COUNT = DEFAULT_LABELS.length;
   const SLOT_MIN = 15, START_HOUR = 6, END_HOUR = 22;
   const SLOTS_PER_HOUR = 60 / SLOT_MIN;
   const TOTAL_SLOTS = (END_HOUR - START_HOUR) * SLOTS_PER_HOUR;
@@ -2989,7 +2991,7 @@ async function importLocalStorage() {
     html += '</div>';
     // One row per court
     for (let c = 1; c <= COURT_COUNT; c++){
-      const courtLbl = COURT_LABELS[c-1];
+      const courtLbl = COURT_LABELS_()[c-1];
       html += '<div class="ms-row">';
       html += '<div class="ms-rh">'+(courtLbl==='W'?'Wall':'Court '+courtLbl)+'</div>';
       html += coachCellHTML('morning', c-1);
@@ -3012,7 +3014,7 @@ async function importLocalStorage() {
         const semCls = b.semester ? 'semester' : '';
         const semBadge = b.semester ? '<span class="ms-sembadge">SEM</span>' : '';
         const noteFlag = b.notes ? '<span class="ms-bnoteflag" title="'+esc(b.notes)+'">&#9998;</span>' : '';
-        const ct = b.courts.length > 1 ? ' . Cts ' + b.courts.map(function(x){ return COURT_LABELS[x-1]; }).join(',') : '';
+        const ct = b.courts.length > 1 ? ' . Cts ' + b.courts.map(function(x){ return COURT_LABELS_()[x-1]; }).join(',') : '';
         const noteHtml = b.notes ? '<div class="ms-bnote">'+esc(b.notes)+'</div>' : '';
         const dKey = dupKeyFor(b);
         const dup = !!dKey;
@@ -3058,7 +3060,7 @@ async function importLocalStorage() {
         const dur = e0 - s0;
         const startX = e.clientX;
         const meta = el.querySelector('.ms-bmeta');
-        const ctTxt = (b.courts && b.courts.length > 1) ? ' . Cts ' + b.courts.map(function(x){ return COURT_LABELS[x-1]; }).join(',') : '';
+        const ctTxt = (b.courts && b.courts.length > 1) ? ' . Cts ' + b.courts.map(function(x){ return COURT_LABELS_()[x-1]; }).join(',') : '';
         let moved = false, cur = { start:s0, end:e0 };
         function paint(){
           const left = slotToX(cur.start), width = slotToX(cur.end) - left - 2;
@@ -3149,7 +3151,7 @@ async function importLocalStorage() {
   }
   function refreshCourtChips(){
     const el = document.getElementById('ms-f-courts');
-    el.innerHTML = COURT_LABELS.map(function(lbl,i){
+    el.innerHTML = COURT_LABELS_().map(function(lbl,i){
       const n = i+1, on = selectedCourts.indexOf(n) !== -1;
       return '<div class="ms-court-chip '+(on?'on':'')+'" data-court="'+n+'">'+lbl+'</div>';
     }).join('');
