@@ -576,6 +576,7 @@ tr.coach-locked > td.t-today { background: #fef9c3 !important; }
 .req-card.status-approved { border-left: 4px solid #16a34a; }
 .req-card.status-denied   { border-left: 4px solid #dc2626; }
 .req-card.status-done     { border-left: 4px solid #6366f1; }
+.req-card.status-resolved { border-left: 4px solid #16a34a; }
 .req-coach { font-size: 14px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
 .req-text  { font-size: 14px; color: var(--text); margin-bottom: 6px; }
 .req-note  { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 4px; }
@@ -589,6 +590,7 @@ tr.coach-locked > td.t-today { background: #fef9c3 !important; }
 .req-badge.approved { background: #dcfce7; color: #166534; }
 .req-badge.denied   { background: #fee2e2; color: #991b1b; }
 .req-badge.done     { background: #ede9fe; color: #4c1d95; }
+.req-badge.resolved { background: #dcfce7; color: #166534; }
 .req-btn {
   padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
   cursor: pointer; border: 1px solid var(--border); background: none; color: var(--muted);
@@ -1990,7 +1992,6 @@ function renderRequests() {
     const typeBadge = r.type === 'request'
       ? `<span class="req-badge" style="background:#ede9fe;color:#4c1d95">Request</span>`
       : `<span class="req-badge" style="background:#e0f2fe;color:#075985">Flexible</span>`;
-    const canApply = r.status === 'pending' || r.status === 'approved';
 
     let textHTML, daysHTML, configured;
     if (r.action === 'move_day') {
@@ -2023,9 +2024,8 @@ function renderRequests() {
         ${r.note ? `<div class="req-note" style="margin-top:4px">Note: ${r.note}</div>` : ''}
       </div>
       <div class="req-actions" style="flex-direction:column;align-items:flex-end">
-        ${canApply && configured ? `<button class="req-btn approve" onclick="previewReq(${r.id})">Preview</button>` : ''}
-        ${canApply && configured ? `<button class="req-btn done-btn" onclick="applyReq(${r.id})">Apply</button>` : ''}
         ${r.status === 'pending' ? `<button class="req-btn" onclick="editReq(${r.id})">Edit</button>` : ''}
+        ${r.status === 'pending' ? `<button class="req-btn approve" onclick="reqSetStatus(${r.id},'resolved')">Resolve</button>` : ''}
         ${r.status === 'pending' && r.type === 'request' ? `<button class="req-btn deny" onclick="reqSetStatus(${r.id},'denied')">Deny</button>` : ''}
         ${r.status !== 'pending' ? `<button class="req-btn" onclick="reqSetStatus(${r.id},'pending')">Reopen</button>` : ''}
         <button class="req-btn" onclick="reqDelete(${r.id})" style="color:#dc2626">Delete</button>
