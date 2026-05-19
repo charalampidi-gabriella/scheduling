@@ -2773,9 +2773,37 @@ async function importLocalStorage() {
   function persist(facId){
     clearTimeout(saveTimers[facId]);
     saveTimers[facId] = setTimeout(async function(){
-      const key = FACILITIES.find(function(f){ return f.id===facId; }).key;
-      try { await fetch('/api/state/'+key, { method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify(msState[facId]) }); } catch(e){}
+      saveTimers[facId] = null;
+      await persistNow(facId);
     }, 300);
+  }
+  async function persistNow(facId){
+    const key = FACILITIES.find(function(f){ return f.id===facId; }).key;
+    // Pull the server's latest blocks first and copy approvedDup forward onto
+    // matching ids in msState. Totals (and any other surface) writes approvedDup
+    // directly to the server; without this merge, a stale msState would clobber
+    // those approvals the next time Master persists.
+    try {
+      const r = await fetch('/api/state/'+key, { cache:'no-store' });
+      if (r.ok){
+        const sv = await r.json();
+        if (sv && Array.isArray(sv.blocks) && msState[facId] && Array.isArray(msState[facId].blocks)){
+          const svById = {};
+          sv.blocks.forEach(function(sb){ if (sb && sb.id != null) svById[sb.id] = sb; });
+          msState[facId].blocks.forEach(function(b){
+            const sb = svById[b.id]; if (!sb) return;
+            if (sb.approvedDup && !b.approvedDup) b.approvedDup = true;
+          });
+        }
+      }
+    } catch(e){}
+    try { await fetch('/api/state/'+key, { method:'PUT', headers:{'content-type':'application/json'}, body: JSON.stringify(msState[facId]) }); } catch(e){}
+  }
+  async function flushPending(){
+    const ids = Object.keys(saveTimers).filter(function(f){ return saveTimers[f]; });
+    if (!ids.length) return;
+    ids.forEach(function(f){ clearTimeout(saveTimers[f]); saveTimers[f] = null; });
+    await Promise.all(ids.map(persistNow));
   }
 
   function getRosterDay(){
@@ -3290,12 +3318,14 @@ async function importLocalStorage() {
         // Always rebuild the DOM scaffold (creates #pane-master if absent).
         // Cheap, idempotent, and avoids stale-cache mismatches.
         buildPane();
-        if (!initialized){
-          await bootstrapMS();
-          initialized = true;
-        } else {
-          try { const r = await fetch('/api/pool'); if (r.ok) pools = await r.json(); } catch(e){}
-        }
+        // Flush any pending debounced persist before refetching, otherwise the
+        // refetch could clobber unsaved Master edits.
+        await flushPending();
+        // Re-bootstrap on every open so flags written elsewhere (e.g.
+        // approvedDup set from the Totals tab) are reflected here. Without this,
+        // a stale msState would overwrite those approvals on the next persist.
+        await bootstrapMS();
+        initialized = true;
         // Reveal pane if scheduling's setTab missed it (e.g. element didn't exist yet).
         const p = document.getElementById('pane-master');
         if (p) p.classList.remove('hidden');
