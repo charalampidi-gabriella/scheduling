@@ -76,6 +76,11 @@
 #pane-master .ms-block.ms-dup.peer-hover { box-shadow:0 0 0 3px #fbbf24, 0 0 14px rgba(251,191,36,0.7); z-index:11; }
 #pane-master .ms-block.semester { border:2px dashed #fff; box-shadow:0 0 0 2px var(--ms-navy), 0 1px 2px rgba(0,0,0,0.15); }
 #pane-master .ms-block.semester.ms-dup { box-shadow:0 0 0 2px #dc2626, 0 1px 2px rgba(0,0,0,0.15); }
+/* View-only mode: no edit affordances */
+#pane-master.ms-readonly .ms-block { cursor:default; }
+#pane-master.ms-readonly .ms-block .ms-resize { display:none; }
+#pane-master.ms-readonly .ms-crow { cursor:default; }
+#pane-master.ms-readonly .ms-ghc input { cursor:default; background:transparent; border-color:transparent; color:var(--ms-navy); }
 .ms-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); display:none; align-items:center; justify-content:center; z-index:1000; }
 .ms-overlay.open { display:flex; }
 .ms-overlay .ms-modal { background:#fff; border-radius:8px; width:min(520px,92vw); padding:22px; max-height:90vh; overflow:auto; }
@@ -2625,6 +2630,9 @@ function setTab(tab) {
     const el = document.getElementById(`pane-${t}`);
     if (el) el.classList.toggle('hidden', t !== tab);
   });
+  // The draft selector bar applies to the coach schedule, not the Master Schedule.
+  const scopeBar = document.getElementById('scope-bar');
+  if (scopeBar) scopeBar.classList.toggle('hidden', tab === 'master');
   if (tab === 'master') {
     if (window.MS) window.MS.open();
     else { const p = document.getElementById('pane-master'); if (p) p.innerHTML = '<div style="padding:20px;color:#b00020;font-family:monospace">Master Schedule module did not initialize. Open the browser console (F12) for errors.</div>'; }
@@ -2738,6 +2746,8 @@ async function importLocalStorage() {
   let msState = { satc:{blocks:[]}, pharr:{blocks:[]}, wilco:{blocks:[]} };
   let pools = { satc:{}, pharr:{}, wilco:{} };
   let editingId = null;
+  let editMode = false; // view-only by default; unlocked via password
+  const EDIT_PASSWORD = '2024';
   let selectedCourts = [1];
   let saveTimers = {};
   let drag = null;
@@ -2832,12 +2842,14 @@ async function importLocalStorage() {
     return el;
   }
   function buildPane(){
+    editMode = false; // always start locked when the pane is (re)built
     const el = ensurePane();
     el.innerHTML =
       '<div class="ms-bar" id="ms-facility-tabs"></div>' +
       '<div class="ms-daybar" id="ms-day-tabs"></div>' +
       '<div class="ms-toolbar">' +
-        '<button class="ms-btn primary" id="ms-add-btn">+ Add class</button>' +
+        '<button class="ms-btn" id="ms-edit-toggle">&#128274; Edit</button>' +
+        '<button class="ms-btn primary" id="ms-add-btn" style="display:none;">+ Add class</button>' +
         '<button class="ms-btn" id="ms-export-btn">Export JSON</button>' +
         '<span class="ms-legend">' +
           '<span><span class="ms-sample reg"></span>Adult</span>' +
@@ -2885,7 +2897,14 @@ async function importLocalStorage() {
     document.getElementById('ms-f-junior-age').innerHTML = JUNIOR_AGES.map(function(a){ return '<option value="'+a+'">'+a+'</option>'; }).join('');
     refreshJuniorSkills();
 
-    document.getElementById('ms-add-btn').onclick = function(){ openCreate(activeDay,'09:00','10:00',1); };
+    document.getElementById('ms-edit-toggle').onclick = function(){
+      if (editMode){ setEditMode(false); return; }
+      const pw = prompt('Enter password to edit the schedule:');
+      if (pw === null) return; // cancelled
+      if (pw === EDIT_PASSWORD) setEditMode(true);
+      else alert('Incorrect password.');
+    };
+    document.getElementById('ms-add-btn').onclick = function(){ if (!editMode) return; openCreate(activeDay,'09:00','10:00',1); };
     document.getElementById('ms-cancel-btn').onclick = closeModal;
     document.getElementById('ms-save-btn').onclick = saveModal;
     document.getElementById('ms-delete-btn').onclick = deleteBlock;
@@ -2917,6 +2936,20 @@ async function importLocalStorage() {
     document.getElementById('ms-junior-row').style.display = cat==='junior' ? '' : 'none';
   }
 
+  function setEditMode(on){
+    editMode = !!on;
+    const tog = document.getElementById('ms-edit-toggle');
+    const add = document.getElementById('ms-add-btn');
+    if (tog){
+      tog.innerHTML = editMode ? '&#128275; Done editing' : '&#128274; Edit';
+      tog.classList.toggle('primary', editMode);
+    }
+    if (add) add.style.display = editMode ? '' : 'none';
+    const pane = document.getElementById('pane-master');
+    if (pane) pane.classList.toggle('ms-readonly', !editMode);
+    if (!editMode) closeModal();
+    renderGrid();
+  }
   function renderTabs(){
     const el = document.getElementById('ms-facility-tabs');
     el.innerHTML = FACILITIES.map(function(f){ return '<button class="ms-tab '+(f.id===activeFacility?'active':'')+'" data-fac="'+f.id+'">'+f.name+'</button>'; }).join('');
@@ -2931,7 +2964,7 @@ async function importLocalStorage() {
   function coachCellHTML(shift, courtIdx){
     const r = getRosterDay();
     const cls = shift === 'morning' ? 'ms-ghc morning' : 'ms-ghc evening';
-    return '<div class="'+cls+'"><input data-shift="'+shift+'" data-court="'+courtIdx+'" placeholder="Coach" value="'+esc(r[shift][courtIdx]||'')+'"></div>';
+    return '<div class="'+cls+'"><input data-shift="'+shift+'" data-court="'+courtIdx+'" placeholder="Coach" value="'+esc(r[shift][courtIdx]||'')+'"'+(editMode?'':' disabled')+'></div>';
   }
 
   function renderPool(){
@@ -3079,6 +3112,7 @@ async function importLocalStorage() {
     g.querySelectorAll('.ms-block').forEach(function(el){
       el.addEventListener('mousedown', function(e){
         if (e.button !== 0) return;
+        if (!editMode) return;
         e.stopPropagation();
         const id = el.dataset.id;
         const b = msState[activeFacility].blocks.find(function(x){ return x.id===id; });
@@ -3137,6 +3171,7 @@ async function importLocalStorage() {
   function onColClick(e){ const b = e.target.closest('.ms-block'); if (b) openEdit(b.dataset.id); }
   function onColMouseDown(e){
     if (e.button !== 0) return;
+    if (!editMode) return;
     if (e.target.closest('.ms-block')) return;
     if (e.target.closest('.ms-ghc')) return;
     const colEl = e.currentTarget;
@@ -3328,7 +3363,7 @@ async function importLocalStorage() {
         initialized = true;
         // Reveal pane if scheduling's setTab missed it (e.g. element didn't exist yet).
         const p = document.getElementById('pane-master');
-        if (p) p.classList.remove('hidden');
+        if (p) { p.classList.remove('hidden'); p.classList.add('ms-readonly'); }
         renderTabs(); renderDayTabs(); renderPool(); renderGrid();
       });
     },
