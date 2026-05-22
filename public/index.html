@@ -25,7 +25,7 @@
 #pane-master button.ms-btn:hover { background:var(--ms-plat); }
 #pane-master button.ms-btn.primary { background:var(--ms-navy); color:#fff; border-color:var(--ms-navy); }
 #pane-master button.ms-btn.danger { background:#fff; color:#b00020; border-color:#f2c7cd; }
-#pane-master .ms-pool { padding:8px 24px 10px; position:sticky; top:152px; background:#fff; z-index:50; border-bottom:1px solid var(--ms-border); margin:0 -24px; box-shadow:0 2px 6px rgba(0,0,0,0.08); }
+#pane-master .ms-pool { padding:8px 24px 10px; position:sticky; top:105px; background:#fff; z-index:50; border-bottom:1px solid var(--ms-border); margin:0 -24px; box-shadow:0 2px 6px rgba(0,0,0,0.08); }
 #pane-master .ms-pool-row { display:flex; gap:6px; align-items:center; padding:6px 0; flex-wrap:wrap; }
 #pane-master .ms-pool-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--ms-navy); min-width:140px; }
 #pane-master .ms-pool-label.morning { border-left:4px solid var(--ms-navy); padding-left:8px; }
@@ -2631,8 +2631,12 @@ function setTab(tab) {
     if (el) el.classList.toggle('hidden', t !== tab);
   });
   // The draft selector bar applies to the coach schedule, not the Master Schedule.
+  // When it's hidden, drop the matching offset so the tab bar sits directly
+  // under the header instead of leaving a gap.
   const scopeBar = document.getElementById('scope-bar');
   if (scopeBar) scopeBar.classList.toggle('hidden', tab === 'master');
+  const tabsEl = document.getElementById('tabs');
+  if (tabsEl) tabsEl.classList.toggle('with-scope', tab !== 'master');
   if (tab === 'master') {
     if (window.MS) window.MS.open();
     else { const p = document.getElementById('pane-master'); if (p) p.innerHTML = '<div style="padding:20px;color:#b00020;font-family:monospace">Master Schedule module did not initialize. Open the browser console (F12) for errors.</div>'; }
