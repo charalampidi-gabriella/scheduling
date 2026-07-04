@@ -1012,8 +1012,32 @@ let activeScope = 'current'; // 'current' or numeric draft id
 let currentSched = {};
 let drafts = []; // [{ id, name, schedule, createdAt }]
 
-function isReadOnly() { return activeScope === 'current'; }
+// Draft editing is locked (view-only) until the edit password is entered this
+// session. Promoting to Current always re-prompts (see promoteDraftToCurrent).
+let draftEditUnlocked = false;
+const EDIT_PW = '2024';
+
+function isReadOnly() { return activeScope === 'current' || !draftEditUnlocked; }
 function activeDraft() { return drafts.find(d => d.id === activeScope) || null; }
+
+function readOnlyMsg() {
+  return activeScope === 'current'
+    ? 'The Current schedule is read-only. Switch to a draft to edit.'
+    : 'Editing is locked. Click "Unlock to edit" in the schedule bar.';
+}
+
+function unlockDraftEditing() {
+  if (draftEditUnlocked) return;
+  const pw = prompt('Enter password to edit drafts:');
+  if (pw === null) return; // cancelled
+  if (pw === EDIT_PW) { draftEditUnlocked = true; renderScopeBar(); render(); }
+  else alert('Incorrect password.');
+}
+function lockDraftEditing() {
+  draftEditUnlocked = false;
+  editMode = false; // drop out of shift-swap mode when re-locking
+  renderScopeBar(); render();
+}
 
 function persistCurrent() { kv.setItem('coach_template_v1', JSON.stringify(currentSched)); }
 function persistDrafts()  { kv.setItem('coach_drafts_v1',   JSON.stringify(drafts));      }
@@ -1210,7 +1234,9 @@ function resetDraftToCurrent() {
 
 function promoteDraftToCurrent() {
   const d = activeDraft(); if (!d) return;
-  if (!confirm(`Promote "${d.name}" to Current? This overwrites the current schedule.`)) return;
+  const pw = prompt(`Enter password to promote "${d.name}" to Current.\nThis overwrites the live schedule for everyone.`);
+  if (pw === null) return; // cancelled
+  if (pw !== EDIT_PW) { alert('Incorrect password. Promotion cancelled.'); return; }
   syncMasterRoster(currentSched, d.schedule);
   currentSched = JSON.parse(JSON.stringify(d.schedule));
   persistCurrent();
@@ -1270,22 +1296,31 @@ function duplicateDraft() {
 function renderScopeBar() {
   const bar = document.getElementById('scope-bar');
   const inDraft = activeScope !== 'current';
+  const unlocked = inDraft && draftEditUnlocked;
   bar.classList.toggle('draft', inDraft);
 
   const opts = `<option value="current" ${activeScope==='current'?'selected':''}>Current Schedule</option>`
     + drafts.map(d => `<option value="${d.id}" ${d.id===activeScope?'selected':''}>${d.name}</option>`).join('');
 
-  const tag = inDraft
-    ? `<span class="scope-tag draft">Draft — edits saved here only</span>`
-    : `<span class="scope-tag ro">Read-only</span>`;
+  const tag = !inDraft
+    ? `<span class="scope-tag ro">Read-only</span>`
+    : unlocked
+      ? `<span class="scope-tag draft">Draft — editing unlocked</span>`
+      : `<span class="scope-tag ro">Draft — locked (view-only)</span>`;
 
-  const draftBtns = inDraft ? `
+  let draftBtns = '';
+  if (inDraft && !unlocked) {
+    draftBtns = `<button class="scope-btn primary" onclick="unlockDraftEditing()">&#128274; Unlock to edit</button>`;
+  } else if (unlocked) {
+    draftBtns = `
     <button class="scope-btn" onclick="renameDraft()">Rename</button>
     <button class="scope-btn" onclick="duplicateDraft()">Duplicate</button>
     <button class="scope-btn" onclick="resetDraftToCurrent()">Reset to Current</button>
     <button class="scope-btn primary" onclick="promoteDraftToCurrent()">Promote to Current</button>
     <button class="scope-btn danger" onclick="deleteDraft()">Delete</button>
-  ` : '';
+    <button class="scope-btn" onclick="lockDraftEditing()">&#128275; Lock</button>
+  `;
+  }
 
   bar.innerHTML = `
     <span class="scope-label">Schedule</span>
@@ -1333,7 +1368,7 @@ function unlockAll() { lockedCoaches.clear(); lockedShifts.clear();       saveLo
 
 // ── EDIT MODE ─────────────────────────────────────────────────────────────────
 function toggleEditMode() {
-  if (isReadOnly()) { alert('Current schedule is read-only. Switch to a draft (or create one) to edit.'); return; }
+  if (isReadOnly()) { alert(readOnlyMsg()); return; }
   editMode = !editMode;
   pickedShift = null;
   pendingMoves = [];
@@ -2429,7 +2464,7 @@ function previewReq(id) {
 }
 
 function applyReq(id) {
-  if (isReadOnly()) { alert('Cannot apply to the current (read-only) schedule. Switch to a draft.'); return; }
+  if (isReadOnly()) { alert(readOnlyMsg()); return; }
   const r = requests.find(r=>r.id===id);
   if (r.action === 'move_day') return applyMoveDay(r);
   r.days.forEach(dayIdx => {
@@ -2522,7 +2557,7 @@ function applyMoveDay(r) {
 }
 
 function applyMoveDayTo(reqId, toDay) {
-  if (isReadOnly()) { alert('Cannot apply to the current (read-only) schedule. Switch to a draft.'); return; }
+  if (isReadOnly()) { alert(readOnlyMsg()); return; }
   const r = requests.find(r=>r.id===reqId);
   if (!r) return;
   const fromDay = r.days[0];
@@ -2541,7 +2576,7 @@ function applyMoveDayTo(reqId, toDay) {
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
 function openModal(coachId, dayIdx) {
-  if (isReadOnly()) { alert('Current schedule is read-only. Switch to a draft to edit.'); return; }
+  if (isReadOnly()) { alert(readOnlyMsg()); return; }
   const coach = COACHES.find(c => c.id === coachId);
   if (!coach.locs.length) return; // N/A coaches can't be scheduled
   const { morning, evening } = gs(coachId, dayIdx);
