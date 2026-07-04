@@ -297,6 +297,8 @@ tbody tr:hover td { background: #f8fafc; }
 .nc-optrow .lbl { font-size: 12px; font-weight: 700; width: 66px; }
 .nc-opt { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 5px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; }
 .nc-opt:hover { border-color: #f59e0b; background: #fffbeb; }
+.nc-move-btn { margin-top: 8px; width: 100%; font-size: 12px; font-weight: 600; padding: 6px 8px; border-radius: 6px; border: 1px dashed #f59e0b; background: #fffbeb; color: #b45309; cursor: pointer; }
+.nc-move-btn:hover { background: #fef3c7; }
 
 /* EDIT MODE */
 .edit-bar {
@@ -2756,7 +2758,8 @@ function sblock(shift, label, time, isOn, selLoc, coachLocs) {
           ${!avail ? 'disabled' : ''}
           onclick="setLoc('${locKey}','${lk}')">${ld.name}</button>`;
       }).join('')}
-    </div>` : ''}
+    </div>
+    <button class="nc-move-btn" onclick="moveShiftToNC('${shift}')">⚠ Move to Needs Coverage</button>` : ''}
   </div>`;
 }
 
@@ -2773,6 +2776,23 @@ function saveModal() {
 }
 function clearDay() {
   ss(ms.coachId, ms.dayIdx, { morning: null, evening: null });
+  closeModal();
+  render();
+}
+// Move one of the coach's shifts into the Needs Coverage row: remove it from
+// the coach and record it as a gap to fill (same day/shift/location).
+function moveShiftToNC(shift) {
+  const loc  = shift === 'morning' ? ms.m_loc : ms.e_loc;
+  const isOn = shift === 'morning' ? ms.m_on  : ms.e_on;
+  if (!isOn || !loc) return;
+  const day = ms.dayIdx;
+  // Turn the shift off on the coach, keep the other shift as-is in the modal.
+  if (shift === 'morning') ms.m_on = false; else ms.e_on = false;
+  ss(ms.coachId, day, {
+    morning: ms.m_on ? ms.m_loc : null,
+    evening: ms.e_on ? ms.e_loc : null,
+  });
+  addNC(day, shift, loc); // persists + re-renders
   closeModal();
   render();
 }
