@@ -273,6 +273,31 @@ tbody tr:hover td { background: #f8fafc; }
 .day-col.can-add:hover .add-hint { opacity: 1 !important; }
 .day-col.can-add:hover { background: #f0fdf4; }
 
+/* Needs Coverage — pinned row that can hold several shifts per slot */
+.nc-row { background: #fffbeb; }
+.nc-row td { border-top: 2px solid #f59e0b; border-bottom: 1px solid #fde68a; }
+.nc-row .cc-name { color: #b45309; }
+.nc-sub { font-size: 10px; color: #d97706; margin-top: 3px; font-weight: 600; }
+.nc-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px; border-radius: 4px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+  background: #fff; border: 1px dashed #f59e0b; color: #92400e;
+}
+.nc-badge .sloc { font-size: 9px; font-weight: 800; padding: 1px 4px; border-radius: 2px; color: #fff; }
+.nc-badge.satc  .sloc { background: var(--satc); }
+.nc-badge.pharr .sloc { background: var(--pharr); }
+.nc-badge.wilco .sloc { background: var(--wilco); }
+.nc-x { cursor: pointer; color: #b45309; font-weight: 800; opacity: .5; }
+.nc-x:hover { opacity: 1; }
+.nc-add { color: #d97706; font-size: 11px; font-weight: 600; margin-top: 2px; opacity: 0; transition: opacity 0.1s; }
+.nc-row .day-col:hover .nc-add { opacity: 1; }
+.nc-row .day-col:hover { background: #fef3c7; }
+.nc-optrow { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+.nc-optrow .lbl { font-size: 12px; font-weight: 700; width: 66px; }
+.nc-opt { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 5px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; }
+.nc-opt:hover { border-color: #f59e0b; background: #fffbeb; }
+
 /* EDIT MODE */
 .edit-bar {
   position: sticky; bottom: 0; z-index: 90;
@@ -1697,6 +1722,103 @@ function getCoverage(locKey, dayIdx, shift) {
   return { cap, locked, unlocked, gap };
 }
 
+// ── NEEDS COVERAGE ────────────────────────────────────────────────────────────
+// A pinned row listing shifts that still need a coach. Stored on the active
+// schedule object under the reserved, underscore-free `needsCoverage` key so it
+// never collides with `${coachId}_${day}` entries and travels with each draft.
+// Unlike a coach, the same day+shift can hold several entries (e.g. Pharr AND
+// SATC both short a morning coach). Editing follows the same lock as drafts.
+let ncModalDay = null;
+function getNC() { return Array.isArray(schedule.needsCoverage) ? schedule.needsCoverage : []; }
+function ncEditable() { return !isReadOnly() && !editMode; }
+function addNC(day, shift, loc) {
+  if (!ncEditable()) return;
+  const list = getNC().slice();
+  list.push({ day, shift, loc });
+  schedule.needsCoverage = list;
+  persistActive();
+  if (ncModalDay !== null) renderNCModal();
+  render();
+}
+function removeNC(idx) {
+  if (!ncEditable()) return;
+  const list = getNC().slice();
+  if (idx < 0 || idx >= list.length) return;
+  list.splice(idx, 1);
+  schedule.needsCoverage = list;
+  persistActive();
+  if (ncModalDay !== null) renderNCModal();
+  render();
+}
+function ncBadge(e, editable) {
+  return `<span class="nc-badge ${e.loc}"><span class="sloc">${LOCS[e.loc].name}</span>${e.shift === 'morning' ? 'Morning' : 'Evening'}`
+    + `${editable ? `<span class="nc-x" onclick="event.stopPropagation();removeNC(${e.i})">✕</span>` : ''}</span>`;
+}
+function renderNCRow() {
+  const editable = ncEditable();
+  const nc = getNC().map((e, i) => ({ ...e, i }));
+  const cells = DAYS.map((_, day) => {
+    const items = nc.filter(e => e.day === day && (filterLoc === 'all' || e.loc === filterLoc));
+    const badges = items.map(e => ncBadge(e, editable)).join('');
+    return `<td class="day-col" ${editable ? `onclick="openNCModal(${day})" style="cursor:copy"` : 'style="cursor:default"'}>
+      <div class="cell-inner">
+        ${badges || '<span class="cell-empty">—</span>'}
+        ${editable ? '<div class="nc-add">+ add</div>' : ''}
+      </div>
+    </td>`;
+  }).join('');
+  const sub = editable ? 'click a day to add' : (isReadOnly() ? 'unlock a draft to edit' : '');
+  return `<tr class="nc-row">
+    <td class="coach-col">
+      <div class="coach-col-inner">
+        <div>
+          <div class="cc-name">⚠ Needs Coverage</div>
+          <div class="nc-sub">${sub}</div>
+        </div>
+      </div>
+    </td>
+    ${cells}
+  </tr>`;
+}
+function openNCModal(day) {
+  if (!ncEditable()) return;
+  ncModalDay = day;
+  renderNCModal();
+}
+function closeNCModal() { ncModalDay = null; document.getElementById('modal-root').innerHTML = ''; }
+function ncBgClose(e) { if (e.target.classList.contains('overlay')) closeNCModal(); }
+function renderNCModal() {
+  const day = ncModalDay;
+  const entries = getNC().map((e, i) => ({ ...e, i })).filter(e => e.day === day);
+  const optRow = (shift, label) => `<div class="nc-optrow">
+    <span class="lbl">${label}</span>
+    ${['satc', 'pharr', 'wilco'].map(lk => `<button class="nc-opt" onclick="addNC(${day},'${shift}','${lk}')">+ ${LOCS[lk].name}</button>`).join('')}
+  </div>`;
+  const listed = entries.length
+    ? entries.map(e => ncBadge(e, true)).join(' ')
+    : '<span class="cell-empty">Nothing added yet</span>';
+  document.getElementById('modal-root').innerHTML = `
+    <div class="overlay" onclick="ncBgClose(event)">
+      <div class="modal">
+        <div class="mhead">
+          <div class="mhead-title">⚠ Needs Coverage</div>
+          <div class="mhead-sub">${DAYS[day]}</div>
+        </div>
+        <div class="mbody">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Add a shift that needs a coach (add more than one for the same slot if needed):</div>
+          ${optRow('morning', 'Morning')}
+          ${optRow('evening', 'Evening')}
+          <div style="margin-top:12px;font-size:12px;font-weight:700">${DAYS[day]} — needs covered:</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${listed}</div>
+        </div>
+        <div class="mfoot">
+          <div></div>
+          <div class="mfoot-right"><button class="btn btn-primary" onclick="closeNCModal()">Done</button></div>
+        </div>
+      </div>
+    </div>`;
+}
+
 // ── REQUESTS STORE ────────────────────────────────────────────────────────────
 function saveReqs() {
   kv.setItem('coach_requests_v1', JSON.stringify(requests));
@@ -1758,7 +1880,7 @@ function renderOverview() {
     ${DAYS.map(d => `<th>${d}</th>`).join('')}
   </tr></thead>`;
 
-  const tbody = `<tbody>${coaches.map(c => {
+  const tbody = `<tbody>${renderNCRow()}${coaches.map(c => {
     const locked = isCoachLocked(c.id);
     return `<tr class="${locked ? 'coach-locked' : ''}">
     <td class="coach-col">
