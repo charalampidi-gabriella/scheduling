@@ -290,15 +290,8 @@ tbody tr:hover td { background: #f8fafc; }
 .nc-badge.wilco .sloc { background: var(--wilco); }
 .nc-x { cursor: pointer; color: #b45309; font-weight: 800; opacity: .5; }
 .nc-x:hover { opacity: 1; }
-.nc-add { color: #d97706; font-size: 11px; font-weight: 600; margin-top: 2px; opacity: 0; transition: opacity 0.1s; }
-.nc-row .day-col:hover .nc-add { opacity: 1; }
-.nc-row .day-col:hover { background: #fef3c7; }
-.nc-optrow { display: flex; gap: 6px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
-.nc-optrow .lbl { font-size: 12px; font-weight: 700; width: 66px; }
-.nc-opt { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 5px; border: 1px solid #e2e8f0; background: #fff; cursor: pointer; }
-.nc-opt:hover { border-color: #f59e0b; background: #fffbeb; }
-.nc-move-btn { margin-top: 8px; width: 100%; font-size: 12px; font-weight: 600; padding: 6px 8px; border-radius: 6px; border: 1px dashed #f59e0b; background: #fffbeb; color: #b45309; cursor: pointer; }
-.nc-move-btn:hover { background: #fef3c7; }
+.nc-badge.picked { outline: 2px solid #f59e0b; outline-offset: 1px; }
+.nc-badge.nc-pending { border-style: solid; opacity: .8; }
 
 /* EDIT MODE */
 .edit-bar {
@@ -839,7 +832,8 @@ let selectedCoachId = 1;
 let locDayIdx       = 0;
 let schedule        = {};
 let editMode        = false;
-let pickedShift     = null;  // { coachId, dayIdx, shift, loc }
+let pickedShift     = null;  // { src:'coach', coachId, dayIdx, shift, loc, originFrom } | { src:'nc', ncId, ... }
+const NC_ID = -1;            // sentinel "coach id" for the Needs Coverage row in the move engine
 let pendingMoves    = [];    // { fromCoachId, fromName, toCoachId, dayIdx, shift, loc }
 let pendingAdds     = [];    // { toCoachId, dayIdx, shift, loc }
 let pendingRemoves  = [];    // { coachId, dayIdx, shift }
@@ -1552,21 +1546,33 @@ ${pendingAdds.map(a => `    <tr>
 
 function saveMoves() {
   pendingMoves.forEach(m => {
-    const fromSched = { ...gs(m.fromCoachId, m.dayIdx) };
-    fromSched[m.shift] = null;
-    delete fromSched[m.shift + 'From'];
-    delete fromSched[m.shift + 'New'];
-    ss(m.fromCoachId, m.dayIdx, fromSched);
-    const toSched = { ...gs(m.toCoachId, m.dayIdx) };
-    toSched[m.shift] = m.loc;
-    // Persist the *original* origin so chained moves keep showing the source
-    // coach — but not when a shift was moved back to the coach it came from.
-    const fromName = m.originFrom || m.fromName;
-    const toName = (COACHES.find(c => c.id === m.toCoachId) || {}).name;
-    if (fromName && fromName !== toName) toSched[m.shift + 'From'] = fromName;
-    else delete toSched[m.shift + 'From'];
-    delete toSched[m.shift + 'New']; // moved-in is not "new", it's "from X"
-    ss(m.toCoachId, m.dayIdx, toSched);
+    // Clear the source (a coach cell, or a Needs Coverage entry)
+    if (m.fromCoachId === NC_ID) {
+      schedule.needsCoverage = getNC().filter(e => e.id !== m.fromNCId);
+    } else {
+      const fromSched = { ...gs(m.fromCoachId, m.dayIdx) };
+      fromSched[m.shift] = null;
+      delete fromSched[m.shift + 'From'];
+      delete fromSched[m.shift + 'New'];
+      ss(m.fromCoachId, m.dayIdx, fromSched);
+    }
+    // Fill the destination (a coach cell, or the Needs Coverage row)
+    if (m.toCoachId === NC_ID) {
+      const list = getNC().slice();
+      list.push({ id: ncUid(), day: m.dayIdx, shift: m.shift, loc: m.loc, from: m.originFrom || m.fromName || null });
+      schedule.needsCoverage = list;
+    } else {
+      const toSched = { ...gs(m.toCoachId, m.dayIdx) };
+      toSched[m.shift] = m.loc;
+      // Persist the *original* origin so chained moves keep showing the source
+      // coach — but not when a shift was moved back to the coach it came from.
+      const fromName = m.originFrom || m.fromName;
+      const toName = (COACHES.find(c => c.id === m.toCoachId) || {}).name;
+      if (fromName && fromName !== toName) toSched[m.shift + 'From'] = fromName;
+      else delete toSched[m.shift + 'From'];
+      delete toSched[m.shift + 'New']; // moved-in is not "new", it's "from X"
+      ss(m.toCoachId, m.dayIdx, toSched);
+    }
   });
   pendingAdds.forEach(a => {
     const sched = { ...gs(a.toCoachId, a.dayIdx) };
@@ -1582,6 +1588,7 @@ function saveMoves() {
     delete sched[r.shift + 'New'];
     ss(r.coachId, r.dayIdx, sched);
   });
+  persistActive(); // ensure direct Needs-Coverage edits are saved
   editMode = false; pickedShift = null; pendingMoves = []; pendingAdds = []; pendingRemoves = []; addPicker = null;
   renderOverview();
 }
@@ -1689,27 +1696,37 @@ function pickShift(coachId, dayIdx, shift) {
   }
   const s = previewSched(coachId, dayIdx);
   if (!s[shift]) return;
-  pickedShift = { coachId, dayIdx, shift, loc: s[shift], originFrom: s[shift + 'From'] || null };
+  pickedShift = { src: 'coach', coachId, dayIdx, shift, loc: s[shift], originFrom: s[shift + 'From'] || null };
   renderOverview();
 }
 
 function dropOnCell(toCoachId, dayIdx) {
-  if (!pickedShift || pickedShift.dayIdx !== dayIdx || pickedShift.coachId === toCoachId) return;
+  if (!pickedShift || pickedShift.dayIdx !== dayIdx) return;
+  if (pickedShift.src === 'coach' && pickedShift.coachId === toCoachId) return; // no self-drop
   const toCoach  = COACHES.find(c => c.id === toCoachId);
   // Target coach must work at that location
   if (!toCoach.locs.includes(pickedShift.loc)) return;
   // Target must not already have that shift on this day
   const tSched = previewSched(toCoachId, dayIdx);
   if (tSched[pickedShift.shift]) return;
-  const fromCoach = COACHES.find(c => c.id === pickedShift.coachId);
-  pendingMoves.push({
-    fromCoachId: pickedShift.coachId,
-    fromName: fromCoach.name,
+  const move = {
+    moveId: ncUid(),
     toCoachId, dayIdx,
     shift: pickedShift.shift,
     loc: pickedShift.loc,
-    originFrom: pickedShift.originFrom || fromCoach.name, // preserve original origin across chains
-  });
+  };
+  if (pickedShift.src === 'nc') {
+    move.fromCoachId = NC_ID;
+    move.fromNCId    = pickedShift.ncId;
+    move.fromName    = 'Needs Coverage';
+    move.originFrom  = pickedShift.originFrom || null; // original coach, if known
+  } else {
+    const fromCoach = COACHES.find(c => c.id === pickedShift.coachId);
+    move.fromCoachId = pickedShift.coachId;
+    move.fromName    = fromCoach.name;
+    move.originFrom  = pickedShift.originFrom || fromCoach.name; // preserve original origin across chains
+  }
+  pendingMoves.push(move);
   pickedShift = null;
   renderOverview();
 }
@@ -1728,48 +1745,100 @@ function getCoverage(locKey, dayIdx, shift) {
 // A pinned row listing shifts that still need a coach. Stored on the active
 // schedule object under the reserved, underscore-free `needsCoverage` key so it
 // never collides with `${coachId}_${day}` entries and travels with each draft.
-// Unlike a coach, the same day+shift can hold several entries (e.g. Pharr AND
-// SATC both short a morning coach). Editing follows the same lock as drafts.
-let ncModalDay = null;
+// Entries: { id, day, shift, loc, from } — `from` keeps the original coach the
+// shift came from. Unlike a coach, the same day+shift can hold several entries.
+// Editing happens through the Edit Shifts pick/drop flow (NC behaves like a
+// coach with id NC_ID); the ✕ deletes an entry outright.
 function getNC() { return Array.isArray(schedule.needsCoverage) ? schedule.needsCoverage : []; }
-function ncEditable() { return !isReadOnly() && !editMode; }
-function addNC(day, shift, loc) {
-  if (!ncEditable()) return;
-  const list = getNC().slice();
-  list.push({ day, shift, loc });
-  schedule.needsCoverage = list;
-  persistActive();
-  if (ncModalDay !== null) renderNCModal();
-  render();
+function ncUid() { return 'nc' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function ensureNCIds() {
+  const list = getNC();
+  let changed = false;
+  list.forEach(e => { if (!e.id) { e.id = ncUid(); changed = true; } });
+  if (changed) { schedule.needsCoverage = list; persistActive(); }
 }
 function removeNC(idx) {
-  if (!ncEditable()) return;
+  if (isReadOnly()) return;
   const list = getNC().slice();
   if (idx < 0 || idx >= list.length) return;
   list.splice(idx, 1);
   schedule.needsCoverage = list;
   persistActive();
-  if (ncModalDay !== null) renderNCModal();
   render();
 }
-function ncBadge(e, editable) {
-  return `<span class="nc-badge ${e.loc}"><span class="sloc">${LOCS[e.loc].name}</span>${e.shift === 'morning' ? 'Morning' : 'Evening'}`
-    + `${editable ? `<span class="nc-x" onclick="event.stopPropagation();removeNC(${e.i})">✕</span>` : ''}</span>`;
+// Needs-Coverage entries for a day, with pending edit-mode moves applied.
+function previewNC(day) {
+  ensureNCIds();
+  let list = getNC().filter(e => e.day === day)
+    .map(e => ({ id: e.id, day, shift: e.shift, loc: e.loc, from: e.from || null, pending: false }));
+  // Drop entries pending-moved OUT onto a coach
+  list = list.filter(e => !pendingMoves.some(m => m.fromNCId === e.id));
+  // Add coach→NC pending moves as provisional entries
+  pendingMoves.filter(m => m.toCoachId === NC_ID && m.dayIdx === day).forEach(m => {
+    list.push({ id: m.moveId, day, shift: m.shift, loc: m.loc, from: m.originFrom || null, pending: true });
+  });
+  return list;
+}
+function pickNC(entryId) {
+  ensureNCIds();
+  const e = getNC().find(x => x.id === entryId);
+  if (!e) return;
+  if (pickedShift && pickedShift.src === 'nc' && pickedShift.ncId === entryId) {
+    pickedShift = null; renderOverview(); return; // click again to deselect
+  }
+  pickedShift = { src: 'nc', ncId: entryId, dayIdx: e.day, shift: e.shift, loc: e.loc, originFrom: e.from || null };
+  renderOverview();
+}
+function dropOnNC(day) {
+  if (!pickedShift || pickedShift.dayIdx !== day || pickedShift.src !== 'coach') return;
+  const fromCoach = COACHES.find(c => c.id === pickedShift.coachId);
+  pendingMoves.push({
+    moveId: ncUid(),
+    fromCoachId: pickedShift.coachId,
+    fromName: fromCoach ? fromCoach.name : null,
+    toCoachId: NC_ID,
+    dayIdx: day,
+    shift: pickedShift.shift,
+    loc: pickedShift.loc,
+    originFrom: pickedShift.originFrom || (fromCoach ? fromCoach.name : null),
+  });
+  pickedShift = null;
+  renderOverview();
+}
+function ncEntryBadge(e) {
+  const picked = pickedShift && pickedShift.src === 'nc' && pickedShift.ncId === e.id;
+  const clickable = editMode && !e.pending;
+  const badge = `<span class="nc-badge ${e.loc} ${picked ? 'picked' : ''} ${e.pending ? 'nc-pending' : ''}"`
+    + `${clickable ? ` onclick="event.stopPropagation();pickNC('${e.id}')" style="cursor:pointer"` : ''}>`
+    + `<span class="sloc">${LOCS[e.loc].name}</span>${e.shift === 'morning' ? 'Morning' : 'Evening'}</span>`;
+  const fromTag = e.from ? `<div class="from-tag">← from ${e.from}</div>` : '';
+  const pendTag = e.pending ? `<div class="from-tag" style="color:#16a34a;font-weight:600;font-style:normal">→ moving here</div>` : '';
+  return `<div>${badge}${fromTag}${pendTag}</div>`;
 }
 function renderNCRow() {
-  const editable = ncEditable();
-  const nc = getNC().map((e, i) => ({ ...e, i }));
-  const cells = DAYS.map((_, day) => {
-    const items = nc.filter(e => e.day === day && (filterLoc === 'all' || e.loc === filterLoc));
-    const badges = items.map(e => ncBadge(e, editable)).join('');
-    return `<td class="day-col" ${editable ? `onclick="openNCModal(${day})" style="cursor:copy"` : 'style="cursor:default"'}>
-      <div class="cell-inner">
-        ${badges || '<span class="cell-empty">—</span>'}
-        ${editable ? '<div class="nc-add">+ add</div>' : ''}
-      </div>
-    </td>`;
-  }).join('');
-  const sub = editable ? 'click a day to add' : (isReadOnly() ? 'unlock a draft to edit' : '');
+  const unlocked = !isReadOnly();
+  let cells;
+  if (editMode) {
+    cells = DAYS.map((_, day) => {
+      const list = previewNC(day).filter(e => filterLoc === 'all' || e.loc === filterLoc);
+      const isDrop = pickedShift && pickedShift.src === 'coach' && pickedShift.dayIdx === day;
+      const inner = list.map(ncEntryBadge).join('') || '<span class="cell-empty">—</span>';
+      return `<td class="day-col ${isDrop ? 'drop-target' : ''}" onclick="${isDrop ? `dropOnNC(${day})` : ''}" style="${isDrop ? 'cursor:cell' : ''}">
+        <div class="cell-inner">${inner}</div>
+      </td>`;
+    }).join('');
+  } else {
+    cells = DAYS.map((_, day) => {
+      const items = getNC().map((e, i) => ({ ...e, i })).filter(e => e.day === day && (filterLoc === 'all' || e.loc === filterLoc));
+      const inner = items.map(e => {
+        const fromTag = e.from ? `<div class="from-tag">← from ${e.from}</div>` : '';
+        const x = unlocked ? `<span class="nc-x" onclick="event.stopPropagation();removeNC(${e.i})">✕</span>` : '';
+        return `<div><span class="nc-badge ${e.loc}"><span class="sloc">${LOCS[e.loc].name}</span>${e.shift === 'morning' ? 'Morning' : 'Evening'}${x}</span>${fromTag}</div>`;
+      }).join('') || '<span class="cell-empty">—</span>';
+      return `<td class="day-col" style="cursor:default"><div class="cell-inner">${inner}</div></td>`;
+    }).join('');
+  }
+  const sub = editMode ? 'pick a shift, then click here' : (unlocked ? 'use Edit Shifts to move' : 'unlock a draft to edit');
   return `<tr class="nc-row">
     <td class="coach-col">
       <div class="coach-col-inner">
@@ -1781,44 +1850,6 @@ function renderNCRow() {
     </td>
     ${cells}
   </tr>`;
-}
-function openNCModal(day) {
-  if (!ncEditable()) return;
-  ncModalDay = day;
-  renderNCModal();
-}
-function closeNCModal() { ncModalDay = null; document.getElementById('modal-root').innerHTML = ''; }
-function ncBgClose(e) { if (e.target.classList.contains('overlay')) closeNCModal(); }
-function renderNCModal() {
-  const day = ncModalDay;
-  const entries = getNC().map((e, i) => ({ ...e, i })).filter(e => e.day === day);
-  const optRow = (shift, label) => `<div class="nc-optrow">
-    <span class="lbl">${label}</span>
-    ${['satc', 'pharr', 'wilco'].map(lk => `<button class="nc-opt" onclick="addNC(${day},'${shift}','${lk}')">+ ${LOCS[lk].name}</button>`).join('')}
-  </div>`;
-  const listed = entries.length
-    ? entries.map(e => ncBadge(e, true)).join(' ')
-    : '<span class="cell-empty">Nothing added yet</span>';
-  document.getElementById('modal-root').innerHTML = `
-    <div class="overlay" onclick="ncBgClose(event)">
-      <div class="modal">
-        <div class="mhead">
-          <div class="mhead-title">⚠ Needs Coverage</div>
-          <div class="mhead-sub">${DAYS[day]}</div>
-        </div>
-        <div class="mbody">
-          <div style="font-size:12px;color:var(--muted);margin-bottom:4px">Add a shift that needs a coach (add more than one for the same slot if needed):</div>
-          ${optRow('morning', 'Morning')}
-          ${optRow('evening', 'Evening')}
-          <div style="margin-top:12px;font-size:12px;font-weight:700">${DAYS[day]} — needs covered:</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${listed}</div>
-        </div>
-        <div class="mfoot">
-          <div></div>
-          <div class="mfoot-right"><button class="btn btn-primary" onclick="closeNCModal()">Done</button></div>
-        </div>
-      </div>
-    </div>`;
 }
 
 // ── REQUESTS STORE ────────────────────────────────────────────────────────────
@@ -1973,7 +2004,7 @@ function renderOverview() {
   const hasPending = pendingMoves.length || pendingAdds.length;
   const editBar = editMode ? `<div class="edit-bar">
     <div class="edit-bar-info">
-      ${pickedShift ? `<span style="color:#fbbf24">Shift picked — click a coach cell to place it</span>` : `Edit mode — click a shift to move, or click an empty cell to add a new shift`}
+      ${pickedShift ? `<span style="color:#fbbf24">Shift picked — click a coach cell or the Needs Coverage row to place it</span>` : `Edit mode — click a shift to move (to a coach or Needs Coverage), or click an empty cell to add a new shift`}
       ${pendingMoves.length ? `<span>${pendingMoves.length} move${pendingMoves.length>1?'s':''}</span>` : ''}
       ${pendingAdds.length ? `<span style="background:#16a34a">${pendingAdds.length} new shift${pendingAdds.length>1?'s':''}</span>` : ''}
     </div>
@@ -2758,8 +2789,7 @@ function sblock(shift, label, time, isOn, selLoc, coachLocs) {
           ${!avail ? 'disabled' : ''}
           onclick="setLoc('${locKey}','${lk}')">${ld.name}</button>`;
       }).join('')}
-    </div>
-    <button class="nc-move-btn" onclick="moveShiftToNC('${shift}')">⚠ Move to Needs Coverage</button>` : ''}
+    </div>` : ''}
   </div>`;
 }
 
@@ -2776,23 +2806,6 @@ function saveModal() {
 }
 function clearDay() {
   ss(ms.coachId, ms.dayIdx, { morning: null, evening: null });
-  closeModal();
-  render();
-}
-// Move one of the coach's shifts into the Needs Coverage row: remove it from
-// the coach and record it as a gap to fill (same day/shift/location).
-function moveShiftToNC(shift) {
-  const loc  = shift === 'morning' ? ms.m_loc : ms.e_loc;
-  const isOn = shift === 'morning' ? ms.m_on  : ms.e_on;
-  if (!isOn || !loc) return;
-  const day = ms.dayIdx;
-  // Turn the shift off on the coach, keep the other shift as-is in the modal.
-  if (shift === 'morning') ms.m_on = false; else ms.e_on = false;
-  ss(ms.coachId, day, {
-    morning: ms.m_on ? ms.m_loc : null,
-    evening: ms.e_on ? ms.e_loc : null,
-  });
-  addNC(day, shift, loc); // persists + re-renders
   closeModal();
   render();
 }
