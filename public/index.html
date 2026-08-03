@@ -3044,6 +3044,7 @@ async function importLocalStorage() {
       '<div class="ms-toolbar">' +
         '<button class="ms-btn" id="ms-edit-toggle">&#128274; Edit</button>' +
         '<button class="ms-btn primary" id="ms-add-btn" style="display:none;">+ Add class</button>' +
+        '<button class="ms-btn" id="ms-print-btn">&#128424; Print all</button>' +
         '<button class="ms-btn" id="ms-export-btn">Export JSON</button>' +
         '<span class="ms-legend">' +
           '<span><span class="ms-sample reg"></span>Adult</span>' +
@@ -3103,6 +3104,7 @@ async function importLocalStorage() {
     document.getElementById('ms-save-btn').onclick = saveModal;
     document.getElementById('ms-delete-btn').onclick = deleteBlock;
     document.getElementById('ms-overlay').onclick = function(e){ if (e.target.id==='ms-overlay') closeModal(); };
+    document.getElementById('ms-print-btn').onclick = printAll;
     document.getElementById('ms-export-btn').onclick = function(){
       const blob = new Blob([JSON.stringify(msState,null,2)], {type:'application/json'});
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'master-schedule.json'; a.click();
@@ -3514,6 +3516,85 @@ async function importLocalStorage() {
     persist(activeFacility);
     closeModal();
     renderGrid();
+  }
+
+  // ── Print: every day of every facility, as a plain paper-friendly listing ──
+  const DAY_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  function courtName(labels, n){ const l = labels[n-1] || n; return l==='W' ? 'Wall' : ('Ct '+l); }
+  function printCoachLine(shift, arr, labels){
+    const list = [];
+    (arr||[]).forEach(function(name, i){ if (name && name.trim()) list.push(courtName(labels, i+1)+' '+name.trim()); });
+    return '<div class="pcoach"><b>'+shift+':</b> ' + (list.length ? esc(list.join('  ·  ')) : '<span class="pnone">unassigned</span>') + '</div>';
+  }
+  function printBodyHTML(){
+    let out = '';
+    FACILITIES.forEach(function(f, fi){
+      const st = msState[f.id] || { blocks:[] };
+      const labels = COURT_LABELS_FOR(f.id);
+      out += '<section class="pfac'+(fi ? ' pbreak' : '')+'">';
+      out += '<h1>'+esc(f.name)+'</h1>';
+      DAYS.forEach(function(_d, di){
+        const blocks = (st.blocks||[]).filter(function(b){ return b.day===di; }).slice().sort(function(a,b){
+          const d = timeToSlot(a.start) - timeToSlot(b.start);
+          if (d) return d;
+          return ((a.courts||[])[0]||0) - ((b.courts||[])[0]||0);
+        });
+        const r = (st.roster||{})[di] || {};
+        out += '<div class="pday"><h2>'+DAY_FULL[di]+'</h2>';
+        out += printCoachLine('Morning', r.morning, labels);
+        out += printCoachLine('Evening', r.evening, labels);
+        if (!blocks.length){
+          out += '<p class="pempty">No classes scheduled.</p>';
+        } else {
+          out += '<table><thead><tr><th class="ptime">Time</th><th class="pcts">Courts</th><th>Class</th><th>Notes</th></tr></thead><tbody>';
+          blocks.forEach(function(b){
+            const cts = (b.courts||[]).map(function(c){ return courtName(labels, c).replace(/^Ct /,''); }).join(', ');
+            out += '<tr>' +
+              '<td class="ptime">'+fmt12(b.start)+'&ndash;'+fmt12(b.end)+'</td>' +
+              '<td class="pcts">'+esc(cts)+'</td>' +
+              '<td>'+esc(b.level || '(no level)')+(b.semester ? ' <span class="psem">SEM</span>' : '')+'</td>' +
+              '<td class="pnotes">'+esc(b.notes || '')+'</td>' +
+            '</tr>';
+          });
+          out += '</tbody></table>';
+        }
+        out += '</div>';
+      });
+      out += '</section>';
+    });
+    return out;
+  }
+  function printAll(){
+    const w = window.open('', '_blank');
+    if (!w){ alert('Your browser blocked the print window. Allow pop-ups for this site and try again.'); return; }
+    const css =
+      'body{font:12px/1.4 Inter,Arial,Helvetica,sans-serif;color:#111;margin:24px;}' +
+      'h1{font-size:20px;color:#1b4458;margin:0 0 4px;border-bottom:3px solid #95d600;padding-bottom:4px;}' +
+      'h2{font-size:14px;color:#1b4458;margin:0 0 4px;}' +
+      '.pstamp{font-size:11px;color:#666;margin-bottom:14px;}' +
+      '.pfac.pbreak{page-break-before:always;}' +
+      '.pday{page-break-inside:avoid;margin:14px 0 0;}' +
+      '.pcoach{font-size:11px;color:#333;margin:1px 0;}' +
+      '.pnone{color:#999;}' +
+      '.pempty{font-size:11px;color:#888;margin:4px 0 0;}' +
+      'table{width:100%;border-collapse:collapse;margin-top:5px;}' +
+      'th{background:#F1F5F5;color:#1b4458;text-align:left;font-size:11px;padding:3px 6px;border:1px solid #cdd8dc;}' +
+      'td{padding:3px 6px;border:1px solid #dde5e8;vertical-align:top;}' +
+      'td.ptime,th.ptime{width:104px;white-space:nowrap;}' +
+      'td.pcts,th.pcts{width:64px;}' +
+      'td.pnotes{color:#444;}' +
+      '.psem{font-size:9px;background:#1b4458;color:#fff;border-radius:3px;padding:0 3px;vertical-align:1px;}' +
+      '@media print{body{margin:12mm;} .pfac.pbreak{page-break-before:always;}}';
+    const stamp = new Date().toLocaleString();
+    w.document.write(
+      '<!doctype html><html><head><meta charset="utf-8"><title>Master Schedule &mdash; all locations</title><style>'+css+'</style></head><body>' +
+      '<div class="pstamp">Rippner Tennis &mdash; Master Schedule, all locations &amp; days &nbsp;&middot;&nbsp; printed '+esc(stamp)+'</div>' +
+      printBodyHTML() +
+      '</body></html>'
+    );
+    w.document.close();
+    w.focus();
+    setTimeout(function(){ try { w.print(); } catch(e){} }, 250);
   }
 
   async function safeRun(label, fn){
