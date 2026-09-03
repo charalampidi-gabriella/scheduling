@@ -66,7 +66,9 @@ Each facility record holds **two independent schedules**, one for each operating
 
 They are *not* derived from each other: a semester class is no longer assumed to become the same class as a drop-in clinic when no semester is active. Block ids are unique across both, so `approvedDup` writes from Totals can target either.
 
-`coach_scope_v1` (which scope is open) and `ms_mode_v1` (which Master Schedule mode is showing) stay in browser localStorage — per-device UI preferences.
+Both schedules are shown stacked on the Master Schedule page (Active semester above, No active semester below).
+
+`coach_scope_v1` (which scope is open) stays in browser localStorage — a per-device UI preference.
 
 ## API
 

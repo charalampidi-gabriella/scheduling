@@ -13,18 +13,18 @@
 #pane-master .ms-daybar { display:flex; gap:6px; padding:10px; flex-wrap:wrap; background:var(--ms-plat); border-top:1px solid var(--ms-border); border-bottom:1px solid var(--ms-border); }
 #pane-master .ms-daytab { padding:6px 14px; border:1px solid var(--ms-border); border-radius:999px; background:#fff; cursor:pointer; font-size:13px; color:var(--ms-muted); }
 #pane-master .ms-daytab.active { background:var(--ms-navy); color:#fff; border-color:var(--ms-navy); font-weight:600; }
-#pane-master .ms-modebar { display:flex; gap:12px; align-items:center; padding:12px 0 0; flex-wrap:wrap; }
-#pane-master .ms-modelbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--ms-navy); }
-#pane-master .ms-modeseg { display:inline-flex; border:1px solid var(--ms-border); border-radius:6px; overflow:hidden; }
-#pane-master .ms-modebtn { padding:7px 16px; border:none; background:#fff; cursor:pointer; font-size:13px; font-weight:600; color:var(--ms-muted); }
-#pane-master .ms-modebtn + .ms-modebtn { border-left:1px solid var(--ms-border); }
-#pane-master .ms-modebtn:hover { background:var(--ms-plat); }
-#pane-master .ms-modebtn.active[data-mode="semester"] { background:var(--ms-navy); color:#fff; }
-#pane-master .ms-modebtn.active[data-mode="nosemester"] { background:var(--ms-green); color:var(--ms-navy); }
+#pane-master .ms-section { margin-top:18px; }
+#pane-master .ms-sechead { display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:0 0 8px; }
+#pane-master .ms-sectitle { display:inline-flex; align-items:center; gap:8px; font-size:14px; font-weight:700; color:var(--ms-navy); padding:6px 14px; border-radius:6px; }
+#pane-master .ms-sectitle[data-mode="semester"] { background:var(--ms-navy); color:#fff; }
+#pane-master .ms-sectitle[data-mode="nosemester"] { background:var(--ms-green); color:var(--ms-navy); }
 #pane-master .ms-modehint { font-size:12px; color:var(--ms-muted); }
+#pane-master .ms-sechead .ms-btn { display:none; }
+#pane-master:not(.ms-readonly) .ms-sechead .ms-btn { display:inline-block; }
 #pane-master .ms-empty { padding:14px 16px; border:1px dashed var(--ms-camp-edge); border-radius:6px; background:var(--ms-plat); color:var(--ms-navy); font-size:13px; margin:0 0 10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-#pane-master.ms-mode-nosemester .ms-gridwrap { border-color:var(--ms-green); box-shadow:0 0 0 2px rgba(149,214,0,0.3); }
-#pane-master.ms-mode-nosemester .ms-row.header .ms-rh { background:rgba(149,214,0,0.25); }
+#pane-master .ms-gridwrap[data-mode="semester"] { border-color:var(--ms-navy); }
+#pane-master .ms-gridwrap[data-mode="nosemester"] { border-color:var(--ms-green); box-shadow:0 0 0 2px rgba(149,214,0,0.3); }
+#pane-master .ms-gridwrap[data-mode="nosemester"] .ms-row.header .ms-rh { background:rgba(149,214,0,0.25); }
 #pane-master .ms-toolbar { padding:10px 0; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px; }
 #pane-master .ms-toolbar .ms-legend { display:flex; gap:14px; margin-left:auto; align-items:center; color:var(--ms-muted); }
 #pane-master .ms-sample { display:inline-block; width:18px; height:12px; border-radius:3px; vertical-align:middle; margin-right:5px; }
@@ -2955,9 +2955,11 @@ async function importLocalStorage() {
     { id:'semester',   name:'Active semester' },
     { id:'nosemester', name:'No active semester' },
   ];
-  const MODE_STORE_KEY = 'ms_mode_v1'; // per-device UI preference
+  // Both schedules are on screen at once, stacked. activeMode is the schedule
+  // the current interaction belongs to; every handler sets it from the grid
+  // section (data-mode) the event happened in before touching state.
   let activeMode = 'semester';
-  try { const m0 = localStorage.getItem(MODE_STORE_KEY); if (m0 && MODES.some(function(x){ return x.id===m0; })) activeMode = m0; } catch(e){}
+  function modeOf(el){ const w = el && el.closest ? el.closest('[data-mode]') : null; return (w && w.dataset.mode) || 'semester'; }
   function modeName(id){ const m = MODES.find(function(x){ return x.id===id; }); return m ? m.name : id; }
   function facName(facId){ const f = FACILITIES.find(function(x){ return x.id===facId; }); return f ? f.name : facId; }
 
@@ -3087,11 +3089,8 @@ async function importLocalStorage() {
     el.innerHTML =
       '<div class="ms-bar" id="ms-facility-tabs"></div>' +
       '<div class="ms-daybar" id="ms-day-tabs"></div>' +
-      '<div class="ms-modebar" id="ms-mode-bar"></div>' +
       '<div class="ms-toolbar">' +
         '<button class="ms-btn" id="ms-edit-toggle">&#128274; Edit</button>' +
-        '<button class="ms-btn primary" id="ms-add-btn" style="display:none;">+ Add class</button>' +
-        '<button class="ms-btn" id="ms-copy-btn" style="display:none;" title="Replace this facility&#39;s No active semester schedule (all days) with a copy of its Active semester schedule">&#10697; Copy from Active semester</button>' +
         '<button class="ms-btn" id="ms-print-btn">&#128424; Print all</button>' +
         '<button class="ms-btn" id="ms-export-btn">Export JSON</button>' +
         '<span class="ms-legend">' +
@@ -3103,8 +3102,20 @@ async function importLocalStorage() {
         '</span>' +
       '</div>' +
       '<div class="ms-pool" id="ms-pool"></div>' +
-      '<div id="ms-empty"></div>' +
-      '<div class="ms-gridwrap"><div class="ms-grid" id="ms-grid"></div></div>' +
+      MODES.map(function(m){
+        return '<div class="ms-section" data-mode="'+m.id+'">' +
+          '<div class="ms-sechead">' +
+            '<span class="ms-sectitle" data-mode="'+m.id+'">'+esc(m.name)+'</span>' +
+            '<span class="ms-modehint">'+(m.id==='semester'
+              ? 'Classes that run while a semester is in session.'
+              : 'Classes that run when no semester is active. A separate schedule, edited independently.')+'</span>' +
+            '<button class="ms-btn primary ms-add-btn" data-mode="'+m.id+'">+ Add class</button>' +
+            (m.id==='nosemester' ? '<button class="ms-btn" id="ms-copy-btn" title="Replace this facility&#39;s No active semester schedule (all days) with a copy of its Active semester schedule">&#10697; Copy from Active semester</button>' : '') +
+          '</div>' +
+          '<div id="ms-empty-'+m.id+'"></div>' +
+          '<div class="ms-gridwrap" data-mode="'+m.id+'"><div class="ms-grid" id="ms-grid-'+m.id+'"></div></div>' +
+        '</div>';
+      }).join('') +
       '<div class="ms-overlay" id="ms-overlay">' +
         '<div class="ms-modal">' +
           '<h2 id="ms-modal-title">Add class</h2>' +
@@ -3148,7 +3159,7 @@ async function importLocalStorage() {
       if (pw === EDIT_PASSWORD) setEditMode(true);
       else alert('Incorrect password.');
     };
-    document.getElementById('ms-add-btn').onclick = function(){ if (!editMode) return; openCreate(activeDay,'09:00','10:00',1); };
+    el.querySelectorAll('.ms-add-btn').forEach(function(b){ b.onclick = function(){ if (!editMode) return; activeMode = b.dataset.mode; openCreate(activeDay,'09:00','10:00',1); }; });
     document.getElementById('ms-cancel-btn').onclick = closeModal;
     document.getElementById('ms-save-btn').onclick = saveModal;
     document.getElementById('ms-delete-btn').onclick = deleteBlock;
@@ -3185,12 +3196,10 @@ async function importLocalStorage() {
   function setEditMode(on){
     editMode = !!on;
     const tog = document.getElementById('ms-edit-toggle');
-    const add = document.getElementById('ms-add-btn');
     if (tog){
       tog.innerHTML = editMode ? '&#128275; Done editing' : '&#128274; Edit';
       tog.classList.toggle('primary', editMode);
     }
-    if (add) add.style.display = editMode ? '' : 'none';
     const pane = document.getElementById('pane-master');
     if (pane) pane.classList.toggle('ms-readonly', !editMode);
     if (!editMode) closeModal();
@@ -3201,45 +3210,22 @@ async function importLocalStorage() {
     el.innerHTML = FACILITIES.map(function(f){ return '<button class="ms-tab '+(f.id===activeFacility?'active':'')+'" data-fac="'+f.id+'">'+f.name+'</button>'; }).join('');
     el.querySelectorAll('.ms-tab').forEach(function(b){ b.onclick = function(){ activeFacility = b.dataset.fac; renderTabs(); renderPool(); renderGrid(); }; });
   }
-  function renderModeBar(){
-    const el = document.getElementById('ms-mode-bar'); if (!el) return;
-    el.innerHTML = '<span class="ms-modelbl">Schedule</span><span class="ms-modeseg">' +
-      MODES.map(function(m){ return '<button class="ms-modebtn '+(m.id===activeMode?'active':'')+'" data-mode="'+m.id+'">'+esc(m.name)+'</button>'; }).join('') +
-      '</span><span class="ms-modehint">' + (activeMode==='semester'
-        ? 'Classes that run while a semester is in session.'
-        : 'Classes that run when no semester is active. A separate schedule, edited independently.') + '</span>';
-    el.querySelectorAll('.ms-modebtn').forEach(function(b){ b.onclick = function(){ setMode(b.dataset.mode); }; });
-  }
-  function setMode(m){
-    if (m === activeMode || !MODES.some(function(x){ return x.id===m; })) return;
-    activeMode = m;
-    try { localStorage.setItem(MODE_STORE_KEY, m); } catch(e){}
-    closeModal();
-    renderModeBar(); renderPool(); renderGrid();
-  }
-  // Mode-dependent chrome: pane class, copy button, print label, empty-state banner.
+  // Per-section chrome: the empty-state banner on the No active semester grid.
   function refreshModeUI(){
-    const pane = document.getElementById('pane-master');
-    if (pane) MODES.forEach(function(m){ pane.classList.toggle('ms-mode-'+m.id, m.id===activeMode); });
-    const copy = document.getElementById('ms-copy-btn');
-    if (copy) copy.style.display = (editMode && activeMode==='nosemester') ? '' : 'none';
-    const pr = document.getElementById('ms-print-btn');
-    if (pr) pr.innerHTML = '&#128424; Print all &middot; ' + esc(modeName(activeMode));
-    const em = document.getElementById('ms-empty');
-    if (em){
-      const r = rec();
-      if (activeMode==='nosemester' && !(r.blocks||[]).length){
-        em.innerHTML = '<div class="ms-empty"><span><b>'+esc(facName(activeFacility))+'</b> has no classes on the <b>No active semester</b> schedule yet.</span>' +
-          (editMode
-            ? '<button class="ms-btn primary" id="ms-empty-copy">Start from a copy of the Active semester schedule</button><span class="ms-modehint">or draw classes on the grid below.</span>'
-            : '<span class="ms-modehint">Unlock <b>Edit</b> to add classes or copy the Active semester schedule.</span>') +
-          '</div>';
-        const b = document.getElementById('ms-empty-copy'); if (b) b.onclick = copyFromSemester;
-      } else em.innerHTML = '';
-    }
+    const em = document.getElementById('ms-empty-nosemester');
+    if (!em) return;
+    const r = modeRec(activeFacility, 'nosemester');
+    if (!(r.blocks||[]).length){
+      em.innerHTML = '<div class="ms-empty"><span><b>'+esc(facName(activeFacility))+'</b> has no classes on the <b>No active semester</b> schedule yet.</span>' +
+        (editMode
+          ? '<button class="ms-btn primary" id="ms-empty-copy">Start from a copy of the Active semester schedule</button><span class="ms-modehint">or draw classes on the grid below.</span>'
+          : '<span class="ms-modehint">Unlock <b>Edit</b> to add classes or copy the Active semester schedule.</span>') +
+        '</div>';
+      const b = document.getElementById('ms-empty-copy'); if (b) b.onclick = copyFromSemester;
+    } else em.innerHTML = '';
   }
   function copyFromSemester(){
-    if (!editMode || activeMode !== 'nosemester') return;
+    if (!editMode) return;
     const src = modeRec(activeFacility,'semester'), dst = modeRec(activeFacility,'nosemester');
     const fn = facName(activeFacility);
     if (!(src.blocks||[]).length){ alert('The Active semester schedule for '+fn+' is empty \u2014 nothing to copy.'); return; }
@@ -3266,9 +3252,12 @@ async function importLocalStorage() {
   function renderPool(){
     const el = document.getElementById('ms-pool');
     const p = (pools[activeFacility]||{})[activeDay] || { morning:[], evening:[] };
-    const r = getRosterDay();
+    // A coach counts as assigned if they sit in a court box on either schedule.
     const assigned = new Set();
-    [].concat(r.morning, r.evening).forEach(function(s){ if (s) s.split(/,\s*/).forEach(function(n){ assigned.add(n); }); });
+    MODES.forEach(function(m){
+      const r = (modeRec(activeFacility, m.id).roster || {})[activeDay]; if (!r) return;
+      [].concat(r.morning||[], r.evening||[]).forEach(function(s){ if (s) s.split(/,\s*/).forEach(function(n){ assigned.add(n); }); });
+    });
     function chips(list, shift){
       if (!list.length) return '<span class="ms-pool-empty">No coaches on this shift</span>';
       return list.map(function(n){ return '<span class="ms-chip '+(assigned.has(n)?'assigned':'')+'" draggable="true" data-shift="'+shift+'" data-name="'+esc(n)+'">'+esc(n)+'</span>'; }).join('');
@@ -3288,6 +3277,7 @@ async function importLocalStorage() {
   function wireCoachInputs(g){
     g.querySelectorAll('.ms-ghc input').forEach(function(inp){
       inp.addEventListener('change', function(){
+        activeMode = modeOf(inp);
         const r = getRosterDay();
         r[inp.dataset.shift][+inp.dataset.court] = inp.value.trim();
         persist(activeFacility); renderPool();
@@ -3304,6 +3294,7 @@ async function importLocalStorage() {
       cell.addEventListener('drop', function(e){
         e.preventDefault(); cell.classList.remove('drop-target');
         const name = e.dataTransfer.getData('text/coach-name'); if (!name) return;
+        activeMode = modeOf(inp);
         const existing = inp.value.trim();
         if (!existing) inp.value = name;
         else if (existing.split(/,\s*/).indexOf(name) === -1) inp.value = existing + ', ' + name;
@@ -3319,7 +3310,13 @@ async function importLocalStorage() {
   // toward totals but are never flagged as duplicates.
   function isWallBlock(b){ return Array.isArray(b.courts) && b.courts.length > 0 && b.courts.every(function(c){ return c === COURT_COUNT; }); }
   function renderGrid(){
-    const g = document.getElementById('ms-grid');
+    MODES.forEach(function(m){ activeMode = m.id; renderGridFor(m.id); });
+    refreshModeUI();
+  }
+  // Renders the grid for one schedule. Expects activeMode === mode so the
+  // roster/block helpers read the right record.
+  function renderGridFor(mode){
+    const g = document.getElementById('ms-grid-'+mode); if (!g) return;
     // Junior duplicate check: same level + same day + same facility (wall classes excluded).
     // Approved duplicates (b.approvedDup === true) are excluded from the count and never flagged.
     const jrLevelCount = {};
@@ -3402,7 +3399,6 @@ async function importLocalStorage() {
         g.querySelectorAll('.ms-block.peer-hover').forEach(function(p){ p.classList.remove('peer-hover'); });
       });
     });
-    refreshModeUI();
   }
 
   function wireBlocks(g){
@@ -3411,6 +3407,7 @@ async function importLocalStorage() {
         if (e.button !== 0) return;
         if (!editMode) return;
         e.stopPropagation();
+        activeMode = modeOf(el);
         const id = el.dataset.id;
         const b = rec().blocks.find(function(x){ return x.id===id; });
         if (!b) return;
@@ -3472,6 +3469,7 @@ async function importLocalStorage() {
     if (e.target.closest('.ms-block')) return;
     if (e.target.closest('.ms-ghc')) return;
     const colEl = e.currentTarget;
+    activeMode = modeOf(colEl);
     const court = +colEl.dataset.court;
     const startSlot = slotFromEvent(colEl, e);
     drag = { court: court, startSlot: startSlot, currentSlot: startSlot, colEl: colEl, previewEl: null };
@@ -3629,10 +3627,10 @@ async function importLocalStorage() {
   const P_SLOT = 11;                       // px per 15-min slot on paper
   const P_TIME_W = P_SLOT * TOTAL_SLOTS;   // 704px timeline
   function pX(s){ return s * P_SLOT; }
-  function printDayHTML(f, di, labels){
-    const st = modeRec(f.id, activeMode) || { blocks:[], roster:{} };
+  function printDayHTML(f, di, labels, mode){
+    const st = modeRec(f.id, mode) || { blocks:[], roster:{} };
     const r = (st.roster||{})[di] || {};
-    let h = '<div class="pday"><h2>'+esc(f.name)+' &middot; '+DAY_FULL[di]+' <span class="pmode">'+esc(modeName(activeMode))+'</span></h2><div class="pgrid">';
+    let h = '<div class="pday"><h2>'+esc(f.name)+' &middot; '+DAY_FULL[di]+' <span class="pmode '+mode+'">'+esc(modeName(mode))+'</span></h2><div class="pgrid">';
     // Header: court | morning | hour ticks | evening
     h += '<div class="prow phead"><div class="prh">Court</div><div class="pgh">Morning</div><div class="ptrow">';
     for (let s = 0; s < TOTAL_SLOTS; s++){
@@ -3673,7 +3671,7 @@ async function importLocalStorage() {
     FACILITIES.forEach(function(f, fi){
       const labels = COURT_LABELS_FOR(f.id);
       out += '<section class="pfac'+(fi ? ' pbreak' : '')+'">';
-      DAYS.forEach(function(_d, di){ out += printDayHTML(f, di, labels); });
+      DAYS.forEach(function(_d, di){ MODES.forEach(function(m){ out += printDayHTML(f, di, labels, m.id); }); });
       out += '</section>';
     });
     return out;
@@ -3689,7 +3687,8 @@ async function importLocalStorage() {
       '.pfac.pbreak{page-break-before:always;}' +
       '.pday{page-break-inside:avoid;margin:0 0 10px;}' +
       '.pday h2{font-size:12px;color:#1b4458;margin:0 0 3px;border-bottom:2px solid #95d600;padding-bottom:2px;}' +
-      '.pmode{float:right;font-size:9px;font-weight:600;color:#1b4458;background:'+(activeMode==='semester'?'#e3ebef':'#e9f7c4')+';border-radius:3px;padding:1px 6px;}' +
+      '.pmode{float:right;font-size:9px;font-weight:600;color:#1b4458;background:#e3ebef;border-radius:3px;padding:1px 6px;}' +
+      '.pmode.nosemester{background:#e9f7c4;}' +
       '.pgrid{border:1px solid #d8e1e3;width:'+(46+84+P_TIME_W+84)+'px;}' +
       '.prow{display:grid;grid-template-columns:46px 84px '+P_TIME_W+'px 84px;border-bottom:1px solid #d8e1e3;}' +
       '.prow:last-child{border-bottom:none;}' +
@@ -3715,8 +3714,8 @@ async function importLocalStorage() {
       '.pbn{font-size:7px;opacity:0.95;word-break:break-word;}';
     const stamp = new Date().toLocaleString();
     w.document.write(
-      '<!doctype html><html><head><meta charset="utf-8"><title>Master Schedule &mdash; '+esc(modeName(activeMode))+' &mdash; all locations</title><style>'+css+'</style></head><body>' +
-      '<div class="pstamp">Rippner Tennis &mdash; Master Schedule &middot; <b>'+esc(modeName(activeMode))+'</b> schedule, all locations &amp; days &nbsp;&middot;&nbsp; printed '+esc(stamp)+'</div>' +
+      '<!doctype html><html><head><meta charset="utf-8"><title>Master Schedule &mdash; all locations</title><style>'+css+'</style></head><body>' +
+      '<div class="pstamp">Rippner Tennis &mdash; Master Schedule, all locations &amp; days &middot; Active semester and No active semester schedules &nbsp;&middot;&nbsp; printed '+esc(stamp)+'</div>' +
       printBodyHTML() +
       '</body></html>'
     );
@@ -3749,7 +3748,7 @@ async function importLocalStorage() {
         if (approved) { if (!b.approvedDup) { b.approvedDup = true; touched = true; } }
         else { if (b.approvedDup) { delete b.approvedDup; touched = true; } }
       }); });
-      if (touched && document.getElementById('ms-grid') && facId === activeFacility) renderGrid();
+      if (touched && document.getElementById('ms-grid-semester') && facId === activeFacility) renderGrid();
     },
     async open(){
       console.log('[Master Schedule] open(), initialized=', initialized);
@@ -3768,7 +3767,7 @@ async function importLocalStorage() {
         // Reveal pane if scheduling's setTab missed it (e.g. element didn't exist yet).
         const p = document.getElementById('pane-master');
         if (p) { p.classList.remove('hidden'); p.classList.add('ms-readonly'); }
-        renderTabs(); renderDayTabs(); renderModeBar(); renderPool(); renderGrid();
+        renderTabs(); renderDayTabs(); renderPool(); renderGrid();
       });
     },
     // Called by the Overview when a draft is promoted to Current.
@@ -3802,7 +3801,7 @@ async function importLocalStorage() {
         });
         const facIds = Object.keys(touched);
         facIds.forEach(function(f){ persist(f); });
-        if (facIds.length && document.getElementById('ms-grid')){ renderPool(); renderGrid(); }
+        if (facIds.length && document.getElementById('ms-grid-semester')){ renderPool(); renderGrid(); }
       } catch(e){ console.error('[Master Schedule] syncRoster', e); }
     }
   };
