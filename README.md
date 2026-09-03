@@ -55,8 +55,18 @@ Single table `kv` with four rows (one per key):
 | `drafts`           | `[{ id, name, schedule, createdAt }]` |
 | `locks`            | `{ coaches: [coachId], shifts: ["<cid>_<day>_<shift>"] }` |
 | `requests`         | `[{ id, coachId, type, shift, action, days, loc, note, status, createdAt }]` |
+| `master_satc` / `master_pharr` / `master_wilco` | `{ blocks, roster, nosemester: { blocks, roster } }` — see below |
 
-`coach_scope_v1` (which scope is open) stays in browser localStorage — it's a per-device UI preference.
+### Master Schedule: two schedules per facility
+
+Each facility record holds **two independent schedules**, one for each operating mode:
+
+- **Active semester** — the root `blocks` / `roster` (unchanged from the original single-schedule layout, so older records need no migration).
+- **No active semester** — the `nosemester` sub-record with its own `blocks` / `roster`. It starts absent/empty; the Master Schedule offers a one-click "copy from Active semester" as a starting point (fresh block ids, `semester` flag cleared).
+
+They are *not* derived from each other: a semester class is no longer assumed to become the same class as a drop-in clinic when no semester is active. Block ids are unique across both, so `approvedDup` writes from Totals can target either.
+
+`coach_scope_v1` (which scope is open) and `ms_mode_v1` (which Master Schedule mode is showing) stay in browser localStorage — per-device UI preferences.
 
 ## API
 
@@ -64,7 +74,7 @@ Single table `kv` with four rows (one per key):
 - `GET  /api/state/:key` → returns one key.
 - `PUT  /api/state/:key` → body = JSON value to store. Writes are debounced 250ms client-side.
 
-Allowed keys: `current_schedule`, `drafts`, `locks`, `requests`.
+Allowed keys: `current_schedule`, `drafts`, `locks`, `requests`, `coaches`, `locations`, `master_satc`, `master_pharr`, `master_wilco`, `master_programs`.
 
 ## Auth
 

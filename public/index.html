@@ -13,6 +13,18 @@
 #pane-master .ms-daybar { display:flex; gap:6px; padding:10px; flex-wrap:wrap; background:var(--ms-plat); border-top:1px solid var(--ms-border); border-bottom:1px solid var(--ms-border); }
 #pane-master .ms-daytab { padding:6px 14px; border:1px solid var(--ms-border); border-radius:999px; background:#fff; cursor:pointer; font-size:13px; color:var(--ms-muted); }
 #pane-master .ms-daytab.active { background:var(--ms-navy); color:#fff; border-color:var(--ms-navy); font-weight:600; }
+#pane-master .ms-modebar { display:flex; gap:12px; align-items:center; padding:12px 0 0; flex-wrap:wrap; }
+#pane-master .ms-modelbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--ms-navy); }
+#pane-master .ms-modeseg { display:inline-flex; border:1px solid var(--ms-border); border-radius:6px; overflow:hidden; }
+#pane-master .ms-modebtn { padding:7px 16px; border:none; background:#fff; cursor:pointer; font-size:13px; font-weight:600; color:var(--ms-muted); }
+#pane-master .ms-modebtn + .ms-modebtn { border-left:1px solid var(--ms-border); }
+#pane-master .ms-modebtn:hover { background:var(--ms-plat); }
+#pane-master .ms-modebtn.active[data-mode="semester"] { background:var(--ms-navy); color:#fff; }
+#pane-master .ms-modebtn.active[data-mode="nosemester"] { background:var(--ms-green); color:var(--ms-navy); }
+#pane-master .ms-modehint { font-size:12px; color:var(--ms-muted); }
+#pane-master .ms-empty { padding:14px 16px; border:1px dashed var(--ms-camp-edge); border-radius:6px; background:var(--ms-plat); color:var(--ms-navy); font-size:13px; margin:0 0 10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+#pane-master.ms-mode-nosemester .ms-gridwrap { border-color:var(--ms-green); box-shadow:0 0 0 2px rgba(149,214,0,0.3); }
+#pane-master.ms-mode-nosemester .ms-row.header .ms-rh { background:rgba(149,214,0,0.25); }
 #pane-master .ms-toolbar { padding:10px 0; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:13px; }
 #pane-master .ms-toolbar .ms-legend { display:flex; gap:14px; margin-left:auto; align-items:center; color:var(--ms-muted); }
 #pane-master .ms-sample { display:inline-block; width:18px; height:12px; border-radius:3px; vertical-align:middle; margin-right:5px; }
@@ -2936,8 +2948,38 @@ async function importLocalStorage() {
     return '';
   }
 
+  // Two independent schedules per facility/day. Stored in one master_<fac>
+  // record:   root { blocks, roster }        -> Active semester
+  //           .nosemester { blocks, roster } -> No active semester
+  const MODES = [
+    { id:'semester',   name:'Active semester' },
+    { id:'nosemester', name:'No active semester' },
+  ];
+  const MODE_STORE_KEY = 'ms_mode_v1'; // per-device UI preference
+  let activeMode = 'semester';
+  try { const m0 = localStorage.getItem(MODE_STORE_KEY); if (m0 && MODES.some(function(x){ return x.id===m0; })) activeMode = m0; } catch(e){}
+  function modeName(id){ const m = MODES.find(function(x){ return x.id===id; }); return m ? m.name : id; }
+  function facName(facId){ const f = FACILITIES.find(function(x){ return x.id===facId; }); return f ? f.name : facId; }
+
   let activeFacility = 'satc', activeDay = 0;
-  let msState = { satc:{blocks:[]}, pharr:{blocks:[]}, wilco:{blocks:[]} };
+  let msState = { satc:{blocks:[],roster:{}}, pharr:{blocks:[],roster:{}}, wilco:{blocks:[],roster:{}} };
+  // The { blocks, roster } record for a facility in a given schedule mode,
+  // normalized in place so callers can read/write it directly.
+  function modeRec(facId, mode){
+    const st = msState[facId];
+    if (!st) return null;
+    if ((mode || activeMode) === 'nosemester'){
+      if (!st.nosemester || typeof st.nosemester !== 'object') st.nosemester = { blocks:[], roster:{} };
+      if (!Array.isArray(st.nosemester.blocks)) st.nosemester.blocks = [];
+      if (!st.nosemester.roster || typeof st.nosemester.roster !== 'object') st.nosemester.roster = {};
+      return st.nosemester;
+    }
+    if (!Array.isArray(st.blocks)) st.blocks = [];
+    if (!st.roster || typeof st.roster !== 'object') st.roster = {};
+    return st;
+  }
+  function rec(){ return modeRec(activeFacility, activeMode); }
+  function bothRecs(facId){ return [modeRec(facId,'semester'), modeRec(facId,'nosemester')]; }
   let pools = { satc:{}, pharr:{}, wilco:{} };
   let editingId = null;
   let editMode = false; // view-only by default; unlocked via password
@@ -2965,8 +3007,8 @@ async function importLocalStorage() {
       for (let i = 0; i < FACILITIES.length; i++) {
         const f = FACILITIES[i];
         const v = data[f.key];
-        msState[f.id] = (v && typeof v==='object' && Array.isArray(v.blocks)) ? v : {blocks:[]};
-        if (!msState[f.id].roster) msState[f.id].roster = {};
+        msState[f.id] = (v && typeof v==='object' && !Array.isArray(v)) ? v : {};
+        bothRecs(f.id); // normalize blocks/roster for both schedules
       }
     } catch(e){ console.error('[MS] state fetch', e); }
     try {
@@ -2991,13 +3033,18 @@ async function importLocalStorage() {
       const r = await fetch('/api/state/'+key, { cache:'no-store' });
       if (r.ok){
         const sv = await r.json();
-        if (sv && Array.isArray(sv.blocks) && msState[facId] && Array.isArray(msState[facId].blocks)){
-          const svById = {};
-          sv.blocks.forEach(function(sb){ if (sb && sb.id != null) svById[sb.id] = sb; });
-          msState[facId].blocks.forEach(function(b){
-            const sb = svById[b.id]; if (!sb) return;
-            if (sb.approvedDup && !b.approvedDup) b.approvedDup = true;
-          });
+        if (sv && typeof sv === 'object' && msState[facId]){
+          const mergeDup = function(svBlocks, localBlocks){
+            if (!Array.isArray(svBlocks) || !Array.isArray(localBlocks)) return;
+            const svById = {};
+            svBlocks.forEach(function(sb){ if (sb && sb.id != null) svById[sb.id] = sb; });
+            localBlocks.forEach(function(b){
+              const sb = svById[b.id]; if (!sb) return;
+              if (sb.approvedDup && !b.approvedDup) b.approvedDup = true;
+            });
+          };
+          mergeDup(sv.blocks, msState[facId].blocks);
+          mergeDup(sv.nosemester && sv.nosemester.blocks, msState[facId].nosemester && msState[facId].nosemester.blocks);
         }
       }
     } catch(e){}
@@ -3011,8 +3058,7 @@ async function importLocalStorage() {
   }
 
   function getRosterDay(){
-    const fac = msState[activeFacility];
-    if (!fac.roster) fac.roster = {};
+    const fac = rec();
     let r = fac.roster[activeDay];
     if (!r || !Array.isArray(r.morning) || !Array.isArray(r.evening)){
       r = { morning: Array(COURT_COUNT).fill(''), evening: Array(COURT_COUNT).fill('') };
@@ -3041,9 +3087,11 @@ async function importLocalStorage() {
     el.innerHTML =
       '<div class="ms-bar" id="ms-facility-tabs"></div>' +
       '<div class="ms-daybar" id="ms-day-tabs"></div>' +
+      '<div class="ms-modebar" id="ms-mode-bar"></div>' +
       '<div class="ms-toolbar">' +
         '<button class="ms-btn" id="ms-edit-toggle">&#128274; Edit</button>' +
         '<button class="ms-btn primary" id="ms-add-btn" style="display:none;">+ Add class</button>' +
+        '<button class="ms-btn" id="ms-copy-btn" style="display:none;" title="Replace this facility&#39;s No active semester schedule (all days) with a copy of its Active semester schedule">&#10697; Copy from Active semester</button>' +
         '<button class="ms-btn" id="ms-print-btn">&#128424; Print all</button>' +
         '<button class="ms-btn" id="ms-export-btn">Export JSON</button>' +
         '<span class="ms-legend">' +
@@ -3055,6 +3103,7 @@ async function importLocalStorage() {
         '</span>' +
       '</div>' +
       '<div class="ms-pool" id="ms-pool"></div>' +
+      '<div id="ms-empty"></div>' +
       '<div class="ms-gridwrap"><div class="ms-grid" id="ms-grid"></div></div>' +
       '<div class="ms-overlay" id="ms-overlay">' +
         '<div class="ms-modal">' +
@@ -3072,7 +3121,7 @@ async function importLocalStorage() {
           '</div>' +
           '<label class="ms-field" style="margin-bottom:10px;">Courts<div id="ms-f-courts" class="ms-court-chips"></div></label>' +
           '<label class="ms-field">Notes<textarea id="ms-f-notes" rows="2"></textarea></label>' +
-          '<div class="ms-row" style="align-items:flex-end;">' +
+          '<div class="ms-row" id="ms-sem-row" style="align-items:flex-end;">' +
             '<label class="ms-check"><input id="ms-f-semester" type="checkbox"> Semester class</label>' +
           '</div>' +
           '<div class="ms-actions">' +
@@ -3105,6 +3154,7 @@ async function importLocalStorage() {
     document.getElementById('ms-delete-btn').onclick = deleteBlock;
     document.getElementById('ms-overlay').onclick = function(e){ if (e.target.id==='ms-overlay') closeModal(); };
     document.getElementById('ms-print-btn').onclick = printAll;
+    document.getElementById('ms-copy-btn').onclick = copyFromSemester;
     document.getElementById('ms-export-btn').onclick = function(){
       const blob = new Blob([JSON.stringify(msState,null,2)], {type:'application/json'});
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'master-schedule.json'; a.click();
@@ -3150,6 +3200,56 @@ async function importLocalStorage() {
     const el = document.getElementById('ms-facility-tabs');
     el.innerHTML = FACILITIES.map(function(f){ return '<button class="ms-tab '+(f.id===activeFacility?'active':'')+'" data-fac="'+f.id+'">'+f.name+'</button>'; }).join('');
     el.querySelectorAll('.ms-tab').forEach(function(b){ b.onclick = function(){ activeFacility = b.dataset.fac; renderTabs(); renderPool(); renderGrid(); }; });
+  }
+  function renderModeBar(){
+    const el = document.getElementById('ms-mode-bar'); if (!el) return;
+    el.innerHTML = '<span class="ms-modelbl">Schedule</span><span class="ms-modeseg">' +
+      MODES.map(function(m){ return '<button class="ms-modebtn '+(m.id===activeMode?'active':'')+'" data-mode="'+m.id+'">'+esc(m.name)+'</button>'; }).join('') +
+      '</span><span class="ms-modehint">' + (activeMode==='semester'
+        ? 'Classes that run while a semester is in session.'
+        : 'Classes that run when no semester is active. A separate schedule, edited independently.') + '</span>';
+    el.querySelectorAll('.ms-modebtn').forEach(function(b){ b.onclick = function(){ setMode(b.dataset.mode); }; });
+  }
+  function setMode(m){
+    if (m === activeMode || !MODES.some(function(x){ return x.id===m; })) return;
+    activeMode = m;
+    try { localStorage.setItem(MODE_STORE_KEY, m); } catch(e){}
+    closeModal();
+    renderModeBar(); renderPool(); renderGrid();
+  }
+  // Mode-dependent chrome: pane class, copy button, print label, empty-state banner.
+  function refreshModeUI(){
+    const pane = document.getElementById('pane-master');
+    if (pane) MODES.forEach(function(m){ pane.classList.toggle('ms-mode-'+m.id, m.id===activeMode); });
+    const copy = document.getElementById('ms-copy-btn');
+    if (copy) copy.style.display = (editMode && activeMode==='nosemester') ? '' : 'none';
+    const pr = document.getElementById('ms-print-btn');
+    if (pr) pr.innerHTML = '&#128424; Print all &middot; ' + esc(modeName(activeMode));
+    const em = document.getElementById('ms-empty');
+    if (em){
+      const r = rec();
+      if (activeMode==='nosemester' && !(r.blocks||[]).length){
+        em.innerHTML = '<div class="ms-empty"><span><b>'+esc(facName(activeFacility))+'</b> has no classes on the <b>No active semester</b> schedule yet.</span>' +
+          (editMode
+            ? '<button class="ms-btn primary" id="ms-empty-copy">Start from a copy of the Active semester schedule</button><span class="ms-modehint">or draw classes on the grid below.</span>'
+            : '<span class="ms-modehint">Unlock <b>Edit</b> to add classes or copy the Active semester schedule.</span>') +
+          '</div>';
+        const b = document.getElementById('ms-empty-copy'); if (b) b.onclick = copyFromSemester;
+      } else em.innerHTML = '';
+    }
+  }
+  function copyFromSemester(){
+    if (!editMode || activeMode !== 'nosemester') return;
+    const src = modeRec(activeFacility,'semester'), dst = modeRec(activeFacility,'nosemester');
+    const fn = facName(activeFacility);
+    if (!(src.blocks||[]).length){ alert('The Active semester schedule for '+fn+' is empty \u2014 nothing to copy.'); return; }
+    if ((dst.blocks||[]).length && !confirm('Replace the entire "No active semester" schedule for '+fn+' (all days) with a copy of its Active semester schedule?\n\nThis cannot be undone.')) return;
+    // Fresh ids so the two schedules never share a block; nothing is a
+    // "semester class" when no semester is active.
+    dst.blocks = src.blocks.map(function(b){ const c = JSON.parse(JSON.stringify(b)); c.id = uid(); c.semester = false; return c; });
+    dst.roster = JSON.parse(JSON.stringify(src.roster || {}));
+    persist(activeFacility);
+    renderPool(); renderGrid();
   }
   function renderDayTabs(){
     const el = document.getElementById('ms-day-tabs');
@@ -3223,7 +3323,7 @@ async function importLocalStorage() {
     // Junior duplicate check: same level + same day + same facility (wall classes excluded).
     // Approved duplicates (b.approvedDup === true) are excluded from the count and never flagged.
     const jrLevelCount = {};
-    (msState[activeFacility].blocks||[]).forEach(function(b){
+    (rec().blocks||[]).forEach(function(b){
       if (b.day===activeDay && blockCat(b)==='junior' && !isWallBlock(b) && !b.approvedDup){ const lv=b.level||''; jrLevelCount[lv]=(jrLevelCount[lv]||0)+1; }
     });
     const dupGroupKey = {}; // level -> "A","B",...
@@ -3263,7 +3363,7 @@ async function importLocalStorage() {
         const lbl = c===1 ? '<span class="ms-camp-lbl">SUMMER CAMP ZONE</span>' : '';
         html += '<div class="ms-camp" style="left:'+left+'px;width:'+width+'px;">'+lbl+'</div>';
       }
-      const blocks = (msState[activeFacility].blocks||[]).filter(function(b){ return b.day===activeDay && Array.isArray(b.courts) && b.courts.indexOf(c) !== -1; });
+      const blocks = (rec().blocks||[]).filter(function(b){ return b.day===activeDay && Array.isArray(b.courts) && b.courts.indexOf(c) !== -1; });
       for (let bi = 0; bi < blocks.length; bi++){
         const b = blocks[bi];
         const ss = timeToSlot(b.start), es = timeToSlot(b.end);
@@ -3302,6 +3402,7 @@ async function importLocalStorage() {
         g.querySelectorAll('.ms-block.peer-hover').forEach(function(p){ p.classList.remove('peer-hover'); });
       });
     });
+    refreshModeUI();
   }
 
   function wireBlocks(g){
@@ -3311,7 +3412,7 @@ async function importLocalStorage() {
         if (!editMode) return;
         e.stopPropagation();
         const id = el.dataset.id;
-        const b = msState[activeFacility].blocks.find(function(x){ return x.id===id; });
+        const b = rec().blocks.find(function(x){ return x.id===id; });
         if (!b) return;
         const isResize = !!(e.target.closest && e.target.closest('.ms-resize'));
         const s0 = timeToSlot(b.start), e0 = timeToSlot(b.end);
@@ -3434,6 +3535,7 @@ async function importLocalStorage() {
     document.getElementById('ms-f-start').value = startTime;
     document.getElementById('ms-f-end').value = endTime;
     document.getElementById('ms-f-semester').checked = false;
+    document.getElementById('ms-sem-row').style.display = activeMode==='semester' ? '' : 'none';
     setCategoryUI('adult');
     document.getElementById('ms-f-adult-level').value = ADULT_LEVELS[0];
     document.getElementById('ms-f-junior-age').value = JUNIOR_AGES[1];
@@ -3443,7 +3545,7 @@ async function importLocalStorage() {
     document.getElementById('ms-overlay').classList.add('open');
   }
   function openEdit(id){
-    const b = msState[activeFacility].blocks.find(function(x){ return x.id===id; }); if (!b) return;
+    const b = rec().blocks.find(function(x){ return x.id===id; }); if (!b) return;
     editingId = id;
     document.getElementById('ms-modal-title').textContent = 'Edit class';
     document.getElementById('ms-delete-btn').style.display = '';
@@ -3452,6 +3554,7 @@ async function importLocalStorage() {
     document.getElementById('ms-f-start').value = b.start;
     document.getElementById('ms-f-end').value = b.end;
     document.getElementById('ms-f-semester').checked = !!b.semester;
+    document.getElementById('ms-sem-row').style.display = activeMode==='semester' ? '' : 'none';
     const cat = b.category || (b.juniorAge ? 'junior' : 'adult');
     setCategoryUI(cat);
     if (cat==='adult'){
@@ -3481,10 +3584,11 @@ async function importLocalStorage() {
     const start = document.getElementById('ms-f-start').value;
     const end = document.getElementById('ms-f-end').value;
     const notes = document.getElementById('ms-f-notes').value.trim();
-    const semester = document.getElementById('ms-f-semester').checked;
+    // "Semester class" only means something while a semester is active.
+    const semester = activeMode==='semester' && document.getElementById('ms-f-semester').checked;
     if (timeToSlot(end) <= timeToSlot(start)) { alert('End must be after start'); return; }
     const courts = selectedCourts.slice().sort(function(a,b){ return a-b; });
-    const blocks = msState[activeFacility].blocks;
+    const blocks = rec().blocks;
     if (category === 'junior'){
       const newIsWall = courts.length > 0 && courts.every(function(c){ return c === COURT_COUNT; });
       const clash = !newIsWall && blocks.some(function(x){
@@ -3492,8 +3596,7 @@ async function importLocalStorage() {
         return blockCat(x)==='junior' && x.day===day && (x.level||'')===level && !isWallBlock(x);
       });
       if (clash){
-        const facName = (FACILITIES.find(function(f){ return f.id===activeFacility; })||{name:activeFacility}).name;
-        if (!confirm('⚠ There is already a "'+level+'" junior class on '+DAYS[day]+' at '+facName+'.\n\nAdd this one anyway?')) return;
+        if (!confirm('⚠ There is already a "'+level+'" junior class on '+DAYS[day]+' at '+facName(activeFacility)+' ('+modeName(activeMode)+' schedule).\n\nAdd this one anyway?')) return;
       }
     }
     const extras = { category: category, adultLevel: category==='adult'?adultLevel:null, juniorAge: category==='junior'?juniorAge:null, juniorSkill: category==='junior'?juniorSkill:null };
@@ -3512,7 +3615,8 @@ async function importLocalStorage() {
   function deleteBlock(){
     if (!editingId) return;
     if (!confirm('Delete this class?')) return;
-    msState[activeFacility].blocks = msState[activeFacility].blocks.filter(function(b){ return b.id !== editingId; });
+    const r = rec();
+    r.blocks = r.blocks.filter(function(b){ return b.id !== editingId; });
     persist(activeFacility);
     closeModal();
     renderGrid();
@@ -3526,9 +3630,9 @@ async function importLocalStorage() {
   const P_TIME_W = P_SLOT * TOTAL_SLOTS;   // 704px timeline
   function pX(s){ return s * P_SLOT; }
   function printDayHTML(f, di, labels){
-    const st = msState[f.id] || { blocks:[] };
+    const st = modeRec(f.id, activeMode) || { blocks:[], roster:{} };
     const r = (st.roster||{})[di] || {};
-    let h = '<div class="pday"><h2>'+esc(f.name)+' &middot; '+DAY_FULL[di]+'</h2><div class="pgrid">';
+    let h = '<div class="pday"><h2>'+esc(f.name)+' &middot; '+DAY_FULL[di]+' <span class="pmode">'+esc(modeName(activeMode))+'</span></h2><div class="pgrid">';
     // Header: court | morning | hour ticks | evening
     h += '<div class="prow phead"><div class="prh">Court</div><div class="pgh">Morning</div><div class="ptrow">';
     for (let s = 0; s < TOTAL_SLOTS; s++){
@@ -3585,6 +3689,7 @@ async function importLocalStorage() {
       '.pfac.pbreak{page-break-before:always;}' +
       '.pday{page-break-inside:avoid;margin:0 0 10px;}' +
       '.pday h2{font-size:12px;color:#1b4458;margin:0 0 3px;border-bottom:2px solid #95d600;padding-bottom:2px;}' +
+      '.pmode{float:right;font-size:9px;font-weight:600;color:#1b4458;background:'+(activeMode==='semester'?'#e3ebef':'#e9f7c4')+';border-radius:3px;padding:1px 6px;}' +
       '.pgrid{border:1px solid #d8e1e3;width:'+(46+84+P_TIME_W+84)+'px;}' +
       '.prow{display:grid;grid-template-columns:46px 84px '+P_TIME_W+'px 84px;border-bottom:1px solid #d8e1e3;}' +
       '.prow:last-child{border-bottom:none;}' +
@@ -3610,8 +3715,8 @@ async function importLocalStorage() {
       '.pbn{font-size:7px;opacity:0.95;word-break:break-word;}';
     const stamp = new Date().toLocaleString();
     w.document.write(
-      '<!doctype html><html><head><meta charset="utf-8"><title>Master Schedule &mdash; all locations</title><style>'+css+'</style></head><body>' +
-      '<div class="pstamp">Rippner Tennis &mdash; Master Schedule, all locations &amp; days &nbsp;&middot;&nbsp; printed '+esc(stamp)+'</div>' +
+      '<!doctype html><html><head><meta charset="utf-8"><title>Master Schedule &mdash; '+esc(modeName(activeMode))+' &mdash; all locations</title><style>'+css+'</style></head><body>' +
+      '<div class="pstamp">Rippner Tennis &mdash; Master Schedule &middot; <b>'+esc(modeName(activeMode))+'</b> schedule, all locations &amp; days &nbsp;&middot;&nbsp; printed '+esc(stamp)+'</div>' +
       printBodyHTML() +
       '</body></html>'
     );
@@ -3635,14 +3740,15 @@ async function importLocalStorage() {
     // in-memory blocks and re-renders if the grid is on screen. Persistence
     // is handled by the caller (Totals PUTs the master_X record).
     applyDupApproval(facId, blockIds, approved){
-      if (!msState[facId] || !Array.isArray(msState[facId].blocks)) return;
+      if (!msState[facId]) return;
       const idSet = new Set(blockIds || []);
       let touched = false;
-      msState[facId].blocks.forEach(function(b){
+      // Ids are unique across both schedules, so search both.
+      bothRecs(facId).forEach(function(r){ (r.blocks||[]).forEach(function(b){
         if (!idSet.has(b.id)) return;
         if (approved) { if (!b.approvedDup) { b.approvedDup = true; touched = true; } }
         else { if (b.approvedDup) { delete b.approvedDup; touched = true; } }
-      });
+      }); });
       if (touched && document.getElementById('ms-grid') && facId === activeFacility) renderGrid();
     },
     async open(){
@@ -3662,7 +3768,7 @@ async function importLocalStorage() {
         // Reveal pane if scheduling's setTab missed it (e.g. element didn't exist yet).
         const p = document.getElementById('pane-master');
         if (p) { p.classList.remove('hidden'); p.classList.add('ms-readonly'); }
-        renderTabs(); renderDayTabs(); renderPool(); renderGrid();
+        renderTabs(); renderDayTabs(); renderModeBar(); renderPool(); renderGrid();
       });
     },
     // Called by the Overview when a draft is promoted to Current.
@@ -3674,22 +3780,25 @@ async function importLocalStorage() {
         if (!initialized){ await bootstrapMS(); initialized = true; }
         const touched = {};
         changes.forEach(function(ch){
-          const fac = msState[ch.fac]; if (!fac || !fac.roster) return;
-          const r = fac.roster[ch.day];
-          if (!r || !Array.isArray(r[ch.shift])) return;
-          const arr = r[ch.shift];
-          for (let i = 0; i < arr.length; i++){
-            if (!arr[i]) continue;
-            const parts = arr[i].split(/,\s*/);
-            let hit = false;
-            for (let j = 0; j < parts.length; j++){ if (parts[j] === ch.from){ parts[j] = ch.to; hit = true; } }
-            if (hit){
-              const seen = [];
-              parts.forEach(function(p){ if (p && seen.indexOf(p) === -1) seen.push(p); });
-              arr[i] = seen.join(', ');
-              touched[ch.fac] = true;
+          if (!msState[ch.fac]) return;
+          // Coach boxes exist on both schedules; rename in each.
+          bothRecs(ch.fac).forEach(function(fac){
+            const r = fac.roster[ch.day];
+            if (!r || !Array.isArray(r[ch.shift])) return;
+            const arr = r[ch.shift];
+            for (let i = 0; i < arr.length; i++){
+              if (!arr[i]) continue;
+              const parts = arr[i].split(/,\s*/);
+              let hit = false;
+              for (let j = 0; j < parts.length; j++){ if (parts[j] === ch.from){ parts[j] = ch.to; hit = true; } }
+              if (hit){
+                const seen = [];
+                parts.forEach(function(p){ if (p && seen.indexOf(p) === -1) seen.push(p); });
+                arr[i] = seen.join(', ');
+                touched[ch.fac] = true;
+              }
             }
-          }
+          });
         });
         const facIds = Object.keys(touched);
         facIds.forEach(function(f){ persist(f); });
@@ -3719,7 +3828,12 @@ async function importLocalStorage() {
   let store = { satc:[], pharr:[], wilco:[] };
   let rosters = { satc:{}, pharr:{}, wilco:{} };
   let raw = { satc:null, pharr:null, wilco:null }; // full master_X record for PUT-back
-  let filters = { days:new Set([0,1,2,3,4,5,6]), cat:'all', loc:'all', sem:'all', shift:'all', q:'' };
+  // mode: which of the two schedules to total — 'semester' (root blocks/roster)
+  // or 'nosemester' (the .nosemester sub-record). See Master Schedule module.
+  const MODES = [ { id:'semester', name:'Active semester' }, { id:'nosemester', name:'No active semester' } ];
+  function modeName(id){ const m = MODES.find(function(x){ return x.id===id; }); return m ? m.name : id; }
+  function defaultFilters(){ return { days:new Set([0,1,2,3,4,5,6]), cat:'all', loc:'all', sem:'all', shift:'all', q:'', mode:'semester' }; }
+  let filters = defaultFilters();
   function facList(){ return filters.loc==='all' ? FACILITIES : FACILITIES.filter(function(f){ return f.id===filters.loc; }); }
 
   function esc(s){ return String(s).replace(/[&<>"']/g,function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
@@ -3738,14 +3852,28 @@ async function importLocalStorage() {
     try {
       const data = await fetch('/api/state', { cache:'no-store' }).then(function(r){ return r.json(); });
       FACILITIES.forEach(function(f){
-        const v = (data[f.key] && typeof data[f.key] === 'object') ? data[f.key] : {};
+        const v = (data[f.key] && typeof data[f.key] === 'object' && !Array.isArray(data[f.key])) ? data[f.key] : {};
         if (!Array.isArray(v.blocks)) v.blocks = [];
         if (!v.roster || typeof v.roster !== 'object') v.roster = {};
         raw[f.id] = v;
-        store[f.id] = v.blocks;
-        rosters[f.id] = v.roster;
       });
     } catch(e){ console.error('[Totals] load', e); }
+    selectMode();
+  }
+  // Point store/rosters at the blocks of the schedule chosen by filters.mode.
+  // These are the live arrays inside raw[], so approvedDup edits persist via persistFac.
+  function selectMode(){
+    FACILITIES.forEach(function(f){
+      const v = raw[f.id] || {};
+      if (filters.mode === 'nosemester'){
+        const n = (v.nosemester && typeof v.nosemester === 'object') ? v.nosemester : {};
+        store[f.id] = Array.isArray(n.blocks) ? n.blocks : [];
+        rosters[f.id] = (n.roster && typeof n.roster === 'object') ? n.roster : {};
+      } else {
+        store[f.id] = Array.isArray(v.blocks) ? v.blocks : [];
+        rosters[f.id] = (v.roster && typeof v.roster === 'object') ? v.roster : {};
+      }
+    });
   }
 
   function pass(b){
@@ -3831,7 +3959,9 @@ async function importLocalStorage() {
     const dayChips = DAYS.map(function(d,i){ return chip('fday', i, d, filters.days.has(i)); }).join('') +
       '<span class="t-chip" data-fday="all">All</span><span class="t-chip" data-fday="wd">Mon-Fri</span><span class="t-chip" data-fday="we">Sat-Sun</span>';
     const locChips = chip('floc','all','All',filters.loc==='all') + FACILITIES.map(function(f){ return chip('floc', f.id, f.name, filters.loc===f.id); }).join('');
+    const modeChips = MODES.map(function(m){ return chip('fmode', m.id, m.name, filters.mode===m.id); }).join('');
     el.innerHTML =
+      '<div class="t-fgroup"><span class="t-flabel">Schedule</span><div class="t-chips">'+modeChips+'</div></div>' +
       '<div class="t-fgroup"><span class="t-flabel">Location</span><div class="t-chips">'+locChips+'</div></div>' +
       '<div class="t-fgroup"><span class="t-flabel">Category</span><div class="t-chips">'+
         chip('fcat','all','All',filters.cat==='all')+chip('fcat','adult','Adult',filters.cat==='adult')+chip('fcat','junior','Junior',filters.cat==='junior')+'</div></div>' +
@@ -3840,6 +3970,7 @@ async function importLocalStorage() {
       '<div class="t-fgroup"><span class="t-flabel">Days</span><div class="t-chips">'+dayChips+'</div></div>' +
       '<div class="t-spacer"><button class="t-btn" id="t-reset">Reset</button><button class="t-btn" id="t-refresh" title="Re-load from database">&#8635; Refresh</button></div>';
 
+    el.querySelectorAll('[data-fmode]').forEach(function(c){ c.onclick=function(){ filters.mode=c.dataset.fmode; selectMode(); renderFilters(); renderResults(); }; });
     el.querySelectorAll('[data-floc]').forEach(function(c){ c.onclick=function(){ filters.loc=c.dataset.floc; renderFilters(); renderResults(); }; });
     el.querySelectorAll('[data-fcat]').forEach(function(c){ c.onclick=function(){ filters.cat=c.dataset.fcat; renderFilters(); renderResults(); }; });
     el.querySelectorAll('[data-fsem]').forEach(function(c){ c.onclick=function(){ filters.sem=c.dataset.fsem; renderFilters(); renderResults(); }; });
@@ -3851,7 +3982,7 @@ async function importLocalStorage() {
       else { const i=+v; if (filters.days.has(i)) filters.days.delete(i); else filters.days.add(i); if (!filters.days.size) filters.days = new Set([0,1,2,3,4,5,6]); }
       renderFilters(); renderResults();
     }; });
-    const rs = document.getElementById('t-reset'); if (rs) rs.onclick = function(){ filters = { days:new Set([0,1,2,3,4,5,6]), cat:'all', loc:'all', sem:'all', shift:'all', q:'' }; renderFilters(); renderResults(); };
+    const rs = document.getElementById('t-reset'); if (rs) rs.onclick = function(){ filters = defaultFilters(); selectMode(); renderFilters(); renderResults(); };
     const rf = document.getElementById('t-refresh'); if (rf) rf.onclick = async function(){ rf.disabled=true; await load(); rf.disabled=false; renderResults(); };
   }
 
@@ -4001,7 +4132,7 @@ async function importLocalStorage() {
     }
     if (!dayBlocks.length){
       el.innerHTML = '<div class="t-empty">No junior class is scheduled more than once on any day' +
-        (filters.loc !== 'all' ? ' at ' + esc(facs[0].name) : '') + '.</div>';
+        (filters.loc !== 'all' ? ' at ' + esc(facs[0].name) : '') + ' on the '+esc(modeName(filters.mode))+' schedule.</div>';
       return;
     }
     el.innerHTML = '<div class="t-jrdup-summary"><b>'+dupLevelCount+'</b> duplicated level'+(dupLevelCount===1?'':'s')+
@@ -4056,6 +4187,7 @@ async function importLocalStorage() {
     const legEl = document.getElementById('t-legend');
     if (legEl) legEl.innerHTML = facs.map(function(f){ return '<span><i style="background:'+f.color+'"></i>'+esc(f.name)+'</span>'; }).join('') +
       '<span><b style="color:var(--t-navy)">'+totalClasses+'</b> classes &middot; <b style="color:var(--t-navy)">'+levelNames.length+'</b> levels' +
+      ' &middot; <b style="color:var(--t-navy)">'+esc(modeName(filters.mode))+'</b> schedule' +
       (filters.sem==='sem' ? ' &middot; semester only' : filters.sem==='reg' ? ' &middot; non-semester only' : '') + '</span>';
 
     const lb = document.getElementById('t-levelbars');
