@@ -88,6 +88,12 @@
 #pane-master .ms-block.ms-dup.peer-hover { box-shadow:0 0 0 3px #fbbf24, 0 0 14px rgba(251,191,36,0.7); z-index:11; }
 #pane-master .ms-block.semester { border:2px dashed #fff; box-shadow:0 0 0 2px var(--ms-navy), 0 1px 2px rgba(0,0,0,0.15); }
 #pane-master .ms-block.semester.ms-dup { box-shadow:0 0 0 2px #dc2626, 0 1px 2px rgba(0,0,0,0.15); }
+/* Swap mode: pick two classes, they trade day / time / courts */
+#pane-master .ms-section.ms-swapmode .ms-block { cursor:pointer; }
+#pane-master .ms-section.ms-swapmode .ms-block .ms-resize { display:none; }
+#pane-master .ms-section.ms-swapmode .ms-crow { cursor:default; }
+#pane-master .ms-block.ms-swap-pick { outline:3px solid #f59e0b; outline-offset:2px; z-index:12; filter:brightness(1.1); }
+#pane-master .ms-swaphint { color:#b45309; font-weight:600; }
 /* View-only mode: no edit affordances */
 #pane-master.ms-readonly .ms-block { cursor:default; }
 #pane-master.ms-readonly .ms-block .ms-resize { display:none; }
@@ -2989,6 +2995,8 @@ async function importLocalStorage() {
   let selectedCourts = [1];
   let saveTimers = {};
   let drag = null;
+  let swapMode = null;       // schedule (mode id) the "Swap two classes" flow runs in
+  let swapPickId = null;     // first class picked in that flow
   let initialized = false;
 
   function pad(n){ return n<10 ? '0'+n : ''+n; }
@@ -3085,6 +3093,7 @@ async function importLocalStorage() {
   }
   function buildPane(){
     editMode = false; // always start locked when the pane is (re)built
+    swapMode = null; swapPickId = null;
     const el = ensurePane();
     el.innerHTML =
       '<div class="ms-bar" id="ms-facility-tabs"></div>' +
@@ -3110,6 +3119,8 @@ async function importLocalStorage() {
               ? 'Classes that run while a semester is in session.'
               : 'Classes that run when no semester is active. A separate schedule, edited independently.')+'</span>' +
             '<button class="ms-btn primary ms-add-btn" data-mode="'+m.id+'">+ Add class</button>' +
+            '<button class="ms-btn ms-swap-btn" data-mode="'+m.id+'">&#8646; Swap two classes</button>' +
+            '<span class="ms-swaphint" id="ms-swap-hint-'+m.id+'" style="display:none;"></span>' +
             (m.id==='nosemester' ? '<button class="ms-btn" id="ms-copy-btn" title="Replace this facility&#39;s No active semester schedule (all days) with a copy of its Active semester schedule">&#10697; Copy from Active semester</button>' : '') +
           '</div>' +
           '<div id="ms-empty-'+m.id+'"></div>' +
@@ -3160,6 +3171,7 @@ async function importLocalStorage() {
       else alert('Incorrect password.');
     };
     el.querySelectorAll('.ms-add-btn').forEach(function(b){ b.onclick = function(){ if (!editMode) return; activeMode = b.dataset.mode; openCreate(activeDay,'09:00','10:00',1); }; });
+    el.querySelectorAll('.ms-swap-btn').forEach(function(b){ b.onclick = function(){ if (!editMode) return; setSwapMode(swapMode === b.dataset.mode ? null : b.dataset.mode); }; });
     document.getElementById('ms-cancel-btn').onclick = closeModal;
     document.getElementById('ms-save-btn').onclick = saveModal;
     document.getElementById('ms-delete-btn').onclick = deleteBlock;
@@ -3174,7 +3186,8 @@ async function importLocalStorage() {
     document.getElementById('ms-f-junior-age').addEventListener('change', refreshJuniorSkills);
     document.addEventListener('keydown', function(e){
       const ov = document.getElementById('ms-overlay');
-      if (e.key==='Escape' && ov && ov.classList.contains('open')) closeModal();
+      if (e.key==='Escape' && ov && ov.classList.contains('open')) { closeModal(); return; }
+      if (e.key==='Escape' && swapMode) setSwapMode(null);
     });
   }
 
@@ -3203,12 +3216,69 @@ async function importLocalStorage() {
     const pane = document.getElementById('pane-master');
     if (pane) pane.classList.toggle('ms-readonly', !editMode);
     if (!editMode) closeModal();
+    setSwapMode(null);   // also re-renders the grid
+  }
+
+  // ── Swap two classes ─────────────────────────────────
+  // Pick a class, then pick another; they trade places — day, start,
+  // end and courts move with the slot, everything else (level, notes,
+  // semester flag) stays with the class. The two can be on different
+  // days: switch day tabs between the two picks. swapMode holds the
+  // schedule (mode id) the swap runs in — the two schedules are separate
+  // records, so a swap never crosses between them.
+  function setSwapMode(mode){
+    swapMode = (mode && editMode) ? mode : null;
+    swapPickId = null;
+    const el = document.getElementById('pane-master');
+    if (el){
+      el.querySelectorAll('.ms-swap-btn').forEach(function(b){ b.classList.toggle('primary', swapMode === b.dataset.mode); });
+      el.querySelectorAll('.ms-section').forEach(function(sec){ sec.classList.toggle('ms-swapmode', swapMode === sec.dataset.mode); });
+    }
+    updateSwapHint();
     renderGrid();
+  }
+  function updateSwapHint(){
+    MODES.forEach(function(m){
+      const h = document.getElementById('ms-swap-hint-'+m.id); if (!h) return;
+      if (swapMode !== m.id){ h.style.display = 'none'; h.textContent = ''; return; }
+      h.style.display = '';
+      const p = swapPickId && (modeRec(activeFacility, m.id).blocks||[]).find(function(x){ return x.id===swapPickId; });
+      h.textContent = p
+        ? 'Picked "' + (p.level||'(no level)') + '" ' + DAYS[p.day] + ' ' + fmt12(p.start) + ' — click the class to swap it with (Esc to cancel)'
+        : 'Click the first class to swap (Esc to cancel)';
+    });
+  }
+  function swapPick(id){
+    if (!swapMode) return;
+    const blocks = modeRec(activeFacility, swapMode).blocks;
+    if (!swapPickId || swapPickId === id){
+      swapPickId = (swapPickId === id) ? null : id;
+      updateSwapHint();
+      renderGrid();
+      return;
+    }
+    const a = blocks.find(function(x){ return x.id===swapPickId; });
+    const b = blocks.find(function(x){ return x.id===id; });
+    if (!a || !b){ setSwapMode(null); return; }
+    const durA = timeToSlot(a.end) - timeToSlot(a.start);
+    const durB = timeToSlot(b.end) - timeToSlot(b.start);
+    if (durA !== durB){
+      if (!confirm('These classes are different lengths (' + (durA*15) + ' min vs ' + (durB*15) + ' min).\n\nSwapping makes each one take over the other\'s full time slot. Continue?')){
+        return;
+      }
+    }
+    const slotA = { day:a.day, start:a.start, end:a.end, courts:(a.courts||[]).slice() };
+    Object.assign(a, { day:b.day, start:b.start, end:b.end, courts:(b.courts||[]).slice() });
+    Object.assign(b, slotA);
+    persist(activeFacility);
+    swapPickId = null;
+    updateSwapHint();
+    renderDayTabs(); renderGrid();
   }
   function renderTabs(){
     const el = document.getElementById('ms-facility-tabs');
     el.innerHTML = FACILITIES.map(function(f){ return '<button class="ms-tab '+(f.id===activeFacility?'active':'')+'" data-fac="'+f.id+'">'+f.name+'</button>'; }).join('');
-    el.querySelectorAll('.ms-tab').forEach(function(b){ b.onclick = function(){ activeFacility = b.dataset.fac; renderTabs(); renderPool(); renderGrid(); }; });
+    el.querySelectorAll('.ms-tab').forEach(function(b){ b.onclick = function(){ activeFacility = b.dataset.fac; swapPickId = null; renderTabs(); renderPool(); renderGrid(); }; });
   }
   // Per-section chrome: the empty-state banner on the No active semester grid.
   function refreshModeUI(){
@@ -3377,7 +3447,7 @@ async function importLocalStorage() {
         const titleAttr = titleParts.length ? ' title="'+titleParts.join(' — ')+'"' : '';
         const dupBadge = dup ? '<span class="ms-dupbadge" title="'+dupWarn+'">&#9888; '+dKey+'</span>' : '';
         const dupAttr = dup ? ' data-dupkey="'+dKey+'"' : '';
-        html += '<div class="ms-block '+semCls+(dup?' ms-dup':'')+'" data-id="'+b.id+'"'+dupAttr+titleAttr+' style="left:'+left+'px;width:'+width+'px;background:'+blockColor(b)+';"><div class="ms-badges">'+semBadge+dupBadge+noteFlag+'</div><div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div>'+noteHtml+'<div class="ms-resize"></div></div>';
+        html += '<div class="ms-block '+semCls+(dup?' ms-dup':'')+((swapMode===mode&&swapPickId===b.id)?' ms-swap-pick':'')+'" data-id="'+b.id+'"'+dupAttr+titleAttr+' style="left:'+left+'px;width:'+width+'px;background:'+blockColor(b)+';"><div class="ms-badges">'+semBadge+dupBadge+noteFlag+'</div><div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div>'+noteHtml+'<div class="ms-resize"></div></div>';
       }
       html += '</div>';
       html += coachCellHTML('evening', c-1);
@@ -3399,6 +3469,7 @@ async function importLocalStorage() {
         g.querySelectorAll('.ms-block.peer-hover').forEach(function(p){ p.classList.remove('peer-hover'); });
       });
     });
+    updateSwapHint();
   }
 
   function wireBlocks(g){
@@ -3409,6 +3480,7 @@ async function importLocalStorage() {
         e.stopPropagation();
         activeMode = modeOf(el);
         const id = el.dataset.id;
+        if (swapMode){ e.preventDefault(); if (activeMode === swapMode) swapPick(id); return; }
         const b = rec().blocks.find(function(x){ return x.id===id; });
         if (!b) return;
         const isResize = !!(e.target.closest && e.target.closest('.ms-resize'));
@@ -3462,10 +3534,15 @@ async function importLocalStorage() {
     const x = e.clientX - rect.left;
     return Math.max(0, Math.min(TOTAL_SLOTS - 1, Math.floor(x / SLOT_W)));
   }
-  function onColClick(e){ const b = e.target.closest('.ms-block'); if (b) openEdit(b.dataset.id); }
+  function onColClick(e){
+    const b = e.target.closest('.ms-block'); if (!b) return;
+    if (swapMode) { if (modeOf(b) === swapMode) swapPick(b.dataset.id); return; }
+    openEdit(b.dataset.id);
+  }
   function onColMouseDown(e){
     if (e.button !== 0) return;
     if (!editMode) return;
+    if (swapMode && modeOf(e.currentTarget) === swapMode) return;   // no drag-to-create while swapping
     if (e.target.closest('.ms-block')) return;
     if (e.target.closest('.ms-ghc')) return;
     const colEl = e.currentTarget;
