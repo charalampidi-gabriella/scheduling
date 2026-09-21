@@ -30,7 +30,7 @@
 #pane-master .ms-sample { display:inline-block; width:18px; height:12px; border-radius:3px; vertical-align:middle; margin-right:5px; }
 #pane-master .ms-sample.sem { border:2px dashed var(--ms-navy); background:#fff; }
 #pane-master .ms-sample.reg { background:var(--ms-blue); }
-#pane-master .ms-sample.jr { background:#f57c00; }
+#pane-master .ms-sample.jr { background:#d6336c; }
 #pane-master .ms-sample.priv { background:#d4a017; }
 #pane-master .ms-sample.band { background:var(--ms-camp); border-top:2px dotted var(--ms-camp-edge); border-bottom:2px dotted var(--ms-camp-edge); }
 #pane-master button.ms-btn { padding:6px 12px; border:1px solid var(--ms-border); background:#fff; border-radius:5px; cursor:pointer; font-size:13px; }
@@ -3619,7 +3619,7 @@ async function importLocalStorage() {
   function blockColor(b){
     const cat = b.category || (b.juniorAge ? 'junior' : 'adult');
     if (cat === 'adult' && isPrivate(b)) return '#d4a017';
-    return cat === 'junior' ? '#f57c00' : '#2596b5';
+    return cat === 'junior' ? '#d6336c' : '#2596b5';
   }
   function refreshCourtChips(){
     const el = document.getElementById('ms-f-courts');
