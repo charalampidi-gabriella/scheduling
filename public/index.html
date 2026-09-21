@@ -3379,6 +3379,42 @@ async function importLocalStorage() {
   // A class that lives only on the hitting wall (last "court"). These count
   // toward totals but are never flagged as duplicates.
   function isWallBlock(b){ return Array.isArray(b.courts) && b.courts.length > 0 && b.courts.every(function(c){ return c === COURT_COUNT; }); }
+  // Display-only: back-to-back privates on one court collapse into a single
+  // block. A run never crosses the morning/evening shift line when the two
+  // coach boxes differ — it splits there and each half is tagged with its
+  // coach. The stored blocks are untouched (edit mode shows them one by one).
+  function mergePrivateRuns(blocks, roster, courtIdx){
+    function coachAt(slot){
+      const arr = roster && roster[slot < FIRST_EVENING_SLOT ? 'morning' : 'evening'];
+      return ((arr && arr[courtIdx]) || '').trim();
+    }
+    const sorted = blocks.slice().sort(function(a,b){ return timeToSlot(a.start) - timeToSlot(b.start); });
+    const out = [];
+    let run = null;
+    sorted.forEach(function(b){
+      const coach = coachAt(timeToSlot(b.start));
+      const prev = run && run.parts[run.parts.length-1];
+      const chains = prev && isPrivate(b) && prev.end === b.start &&
+        !!prev.semester === !!b.semester && String(prev.courts) === String(b.courts);
+      if (chains && run.coach === coach){
+        run.parts.push(b);
+        if (b.notes && run.notes.indexOf(b.notes) === -1) run.notes.push(b.notes);
+        return;
+      }
+      if (chains){ run.coachChange = true; }
+      run = isPrivate(b) ? { parts:[b], coach:coach, notes:b.notes?[b.notes]:[], coachChange:!!chains } : null;
+      out.push(run || b);
+    });
+    return out.map(function(r){
+      if (!r.parts) return r;
+      if (r.parts.length === 1 && !r.coachChange) return r.parts[0];
+      return Object.assign({}, r.parts[0], {
+        end: r.parts[r.parts.length-1].end,
+        notes: r.notes.join(' / '),
+        shiftCoach: r.coachChange ? r.coach : ''
+      });
+    });
+  }
   function renderGrid(){
     MODES.forEach(function(m){ activeMode = m.id; renderGridFor(m.id); });
     refreshModeUI();
@@ -3430,7 +3466,8 @@ async function importLocalStorage() {
         const lbl = c===1 ? '<span class="ms-camp-lbl">SUMMER CAMP ZONE</span>' : '';
         html += '<div class="ms-camp" style="left:'+left+'px;width:'+width+'px;">'+lbl+'</div>';
       }
-      const blocks = (rec().blocks||[]).filter(function(b){ return b.day===activeDay && Array.isArray(b.courts) && b.courts.indexOf(c) !== -1; });
+      let blocks = (rec().blocks||[]).filter(function(b){ return b.day===activeDay && Array.isArray(b.courts) && b.courts.indexOf(c) !== -1; });
+      if (!editMode) blocks = mergePrivateRuns(blocks, getRosterDay(), c-1);
       for (let bi = 0; bi < blocks.length; bi++){
         const b = blocks[bi];
         const ss = timeToSlot(b.start), es = timeToSlot(b.end);
@@ -3447,7 +3484,7 @@ async function importLocalStorage() {
         const titleAttr = titleParts.length ? ' title="'+titleParts.join(' — ')+'"' : '';
         const dupBadge = dup ? '<span class="ms-dupbadge" title="'+dupWarn+'">&#9888; '+dKey+'</span>' : '';
         const dupAttr = dup ? ' data-dupkey="'+dKey+'"' : '';
-        html += '<div class="ms-block '+semCls+(dup?' ms-dup':'')+((swapMode===mode&&swapPickId===b.id)?' ms-swap-pick':'')+'" data-id="'+b.id+'"'+dupAttr+titleAttr+' style="left:'+left+'px;width:'+width+'px;background:'+blockColor(b)+';"><div class="ms-badges">'+semBadge+dupBadge+noteFlag+'</div><div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+'</div>'+noteHtml+'<div class="ms-resize"></div></div>';
+        html += '<div class="ms-block '+semCls+(dup?' ms-dup':'')+((swapMode===mode&&swapPickId===b.id)?' ms-swap-pick':'')+'" data-id="'+b.id+'"'+dupAttr+titleAttr+' style="left:'+left+'px;width:'+width+'px;background:'+blockColor(b)+';"><div class="ms-badges">'+semBadge+dupBadge+noteFlag+'</div><div class="ms-btitle">'+esc(b.level||'(no level)')+'</div><div class="ms-bmeta">'+fmt12(b.start)+'-'+fmt12(b.end)+ct+(b.shiftCoach?' &middot; '+esc(b.shiftCoach):'')+'</div>'+noteHtml+'<div class="ms-resize"></div></div>';
       }
       html += '</div>';
       html += coachCellHTML('evening', c-1);
@@ -3728,12 +3765,12 @@ async function importLocalStorage() {
         const cl = pX(timeToSlot('09:30')), cw = pX(timeToSlot('12:30')) - cl;
         h += '<div class="pcamp" style="left:'+cl+'px;width:'+cw+'px;">'+(c===1?'<span class="pcamplbl">SUMMER CAMP</span>':'')+'</div>';
       }
-      (st.blocks||[]).filter(function(b){ return b.day===di && Array.isArray(b.courts) && b.courts.indexOf(c) !== -1; })
+      mergePrivateRuns((st.blocks||[]).filter(function(b){ return b.day===di && Array.isArray(b.courts) && b.courts.indexOf(c) !== -1; }), r, c-1)
         .forEach(function(b){
           const left = pX(timeToSlot(b.start)), w = pX(timeToSlot(b.end)) - left - 1;
           h += '<div class="pblock'+(b.semester?' sem':'')+'" style="left:'+left+'px;width:'+w+'px;background:'+blockColor(b)+';">' +
             '<div class="pbt">'+esc(b.level || '(no level)')+(b.semester?' <span class="pbsem">SEM</span>':'')+'</div>' +
-            '<div class="pbm">'+fmt12(b.start)+'&ndash;'+fmt12(b.end)+'</div>' +
+            '<div class="pbm">'+fmt12(b.start)+'&ndash;'+fmt12(b.end)+(b.shiftCoach?' &middot; '+esc(b.shiftCoach):'')+'</div>' +
             (b.notes ? '<div class="pbn">'+esc(b.notes)+'</div>' : '') +
           '</div>';
         });
